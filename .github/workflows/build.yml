@@ -36,6 +36,18 @@ jobs:
             echo Pub Score too low.
             exit 1
           fi
+
+  flutter_ut:
+    name: Flutter unit test
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter test
+
   attach_docs:
     name: Attach dartdoc
     runs-on: ubuntu-latest
@@ -64,18 +76,17 @@ jobs:
       - uses: actions/checkout@v3
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.7.0'
+          channel: 'stable'
           cache: true
       - run: bash ci/dart_pub_publish_check.sh
 
   integration_test_android:
     name: Run Flutter Android Integration Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
-    needs: flutter_codestyle_check
     strategy:
       matrix:
-        version: ["2.10.5", "3.13.4"]
-    runs-on: macos-13
+        version: ["2.10.5", "3.x"]
+    runs-on: macos-12
     timeout-minutes: 120
     env:
       TEST_APP_ID: ${{ secrets.MY_APP_ID }}
@@ -84,7 +95,7 @@ jobs:
       - uses: actions/setup-java@v1
         with:
           java-version: "11"
-      - uses: subosito/flutter-action@v1
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.version }}
       - run: flutter config --enable-macos-desktop
@@ -104,7 +115,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.16"]
     runs-on: macos-12
     timeout-minutes: 120
     env:
@@ -115,9 +126,9 @@ jobs:
         with:
           flutter-version: ${{ matrix.version }}
           cache: true
-      - uses: futureware-tech/simulator-action@v1
+      - uses: futureware-tech/simulator-action@v3
         with:
-          model: 'iPhone 13 Pro Max'
+          model: 'iPhone 14 Pro Max'
       - run: bash ci/run_flutter_integration_test_ios.sh
 
   integration_test_macos:
@@ -125,7 +136,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.x"]
     runs-on: macos-12
     timeout-minutes: 120
     env:
@@ -138,13 +149,39 @@ jobs:
           cache: true
       - run: flutter config --enable-macos-desktop
       - run: bash ci/run_flutter_macos_integration_test.sh
+      - name: Get iris logs macos
+        if: always()
+        run: |
+          sleep 30
+
+          mkdir iris-logs-macos
+          if [ -f "${HOME}/Library/Containers/com.example.fakeTestApp/Data/Library/agora-iris.log" ]; then
+            cp -RP ${HOME}/Library/Containers/com.example.fakeTestApp/Data/Library/agora-iris.log ./iris-logs-macos/agora-iris-fake-test.log
+          fi
+          if [ -f "${HOME}/Library/Containers/com.example.integrationTestApp/Data/Library/agora-iris.log" ]; then
+            cp -RP ${HOME}/Library/Containers/com.example.integrationTestApp/Data/Library/agora-iris.log ./iris-logs-macos/agora-iris-integration-test.log
+          fi
+
+          CRASH_DIR="${HOME}/Library/Logs/DiagnosticReports/"
+          OUTPUT_CRASH_DIR=./iris-logs-macos/crash
+          mkdir -p ${OUTPUT_CRASH_DIR}
+
+          # Copy all files
+          cp -RP $CRASH_DIR* $OUTPUT_CRASH_DIR
+          
+      - name: Upload iris logs macos
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: iris-logs-macos-${{ matrix.version }}
+          path: iris-logs-macos/*
 
   integration_test_windows:
     name: Run Flutter Windows Integration Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.x"]
     runs-on: windows-2019
     timeout-minutes: 120
     env:
@@ -155,18 +192,28 @@ jobs:
         with:
           flutter-version: ${{ matrix.version }}
           cache: true
+      - name: Set up crash dump environment
+        run: .\ci\setup-crash-dumps.ps1
+        shell: powershell
       - run: flutter config --enable-windows-desktop
       - name: Run windows integration test
         shell: bash
         run: |
           bash ci/run_flutter_windows_integration_test.sh
 
+      - name: Upload crash dumps if exist
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-crash-dumps-${{ matrix.version }}
+          path: ./CrashDumps/*
+
   integration_test_web:
     name: Run Flutter Web Integration Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['3.13.7']
+        version: ['3.x']
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -189,14 +236,14 @@ jobs:
     needs: flutter_codestyle_check
     strategy:
       matrix:
-        version: ["2.10.5", "3.0.0"]
+        version: ["2.10.5", "3.x"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-java@v1
         with:
           java-version: "11"
-      - uses: subosito/flutter-action@v1
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.version }}
       - run: flutter pub get
@@ -209,7 +256,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.x"]
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v3
@@ -230,7 +277,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.x"]
     runs-on: macos-12
     timeout-minutes: 120
     steps:
@@ -250,7 +297,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['3.13.6']
+        version: ['3.x']
     runs-on: macos-13
     timeout-minutes: 120
     steps:
@@ -275,7 +322,7 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['2.10.5', '3.0.0']
+        version: ["2.10.5", "3.x"]
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -304,7 +351,7 @@ jobs:
           java-version: '11'
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.0.0'
+          flutter-version: '3.x'
           cache: true
       - name: Checkout hoe
         uses: actions/checkout@v3
@@ -348,14 +395,14 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ["3.0.0"] # Need keep version 3.0.0 at this time, or the test will timeout on github runner
+        version: ["3.x"]
     runs-on: macos-13 # Rendering test on ios simulator need macos 13+
     timeout-minutes: 60
     env:
       TEST_APP_ID: ${{ secrets.MY_APP_ID }}
     steps:
       - uses: actions/checkout@v1
-      - uses: subosito/flutter-action@v1
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.version }}
       - name: Checkout hoe
@@ -380,20 +427,23 @@ jobs:
             --apple-package-name=io.agora.agoraRtcEngineExample \
             --flutter-package-name=agora_rtc_engine \
             --iris-ios-cdn-url=${IRIS_CDN_URL_IOS}
-      - name: Create ios simulator
-        run: |
-          xcrun simctl list
-          # We generate the screenshots base on the simulator "iPhone 13 Pro Max", so we set the SimDeviceType to iPhone 13 Pro Max.
-          # If you need to change the SimDeviceType, you may need to re-generate the screenshots first.
-          xcrun simctl create Flutter-iPhone com.apple.CoreSimulator.SimDeviceType.iPhone-13-Pro-Max com.apple.CoreSimulator.SimRuntime.iOS-16-4 | xargs xcrun simctl boot
+      - uses: futureware-tech/simulator-action@v3
+        with:
+          model: 'iPhone 14 Pro Max'
       - run: bash ci/rendering_test_ios.sh
+
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: debug-golden-files-ios
+          path: test_shard/rendering_test/screenshot/*.debug.png
 
   rendering_test_macos:
     name: Run Flutter macOS Rendering Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['3.0.0']
+        version: ['3.x']
     runs-on: macos-12
     timeout-minutes: 120
     env:
@@ -433,14 +483,17 @@ jobs:
             --flutter-package-name=agora_rtc_engine \
             --iris-macos-cdn-url=${IRIS_CDN_URL_MACOS}
       - run: flutter config --enable-macos-desktop
-      - run: bash ci/rendering_test_macos.sh
+      - name: Run macos rendering test
+        run: |
+          export SAVE_DEBUG_GOLDEN="true"
+          bash ci/rendering_test_macos.sh
 
   rendering_test_windows:
     name: Run Flutter Windows Rendering Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['3.0.0']
+        version: ['3.x']
     runs-on: windows-2019
     timeout-minutes: 120
     env:
@@ -480,6 +533,8 @@ jobs:
       - name: Run windows integration test
         shell: bash
         run: |
+          export SAVE_DEBUG_GOLDEN="true"
+
           bash ci/rendering_test_windows.sh
 
   rendering_test_web:
@@ -487,7 +542,9 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        version: ['3.13.7']
+        # TODO(littlegnal): Temporily pin the Flutter SDK version to 3.16, since the rendering on web not work correct after 3.16, 
+        # see https://github.com/AgoraIO-Extensions/Agora-Flutter-SDK/actions/runs/7958003510/job/21721962323?pr=1572
+        version: ['3.16']
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:

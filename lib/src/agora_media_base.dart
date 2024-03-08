@@ -126,9 +126,9 @@ enum AudioRoute {
   @JsonValue(4)
   routeLoudspeaker,
 
-  /// 5: The audio route is a bluetooth headset.
+  /// @nodoc
   @JsonValue(5)
-  routeHeadsetbluetooth,
+  routeBluetoothDeviceHfp,
 
   /// 7: The audio route is a USB peripheral device. (For macOS only)
   @JsonValue(6)
@@ -145,6 +145,10 @@ enum AudioRoute {
   /// 9: The audio route is Apple AirPlay. (For macOS only)
   @JsonValue(9)
   routeAirplay,
+
+  /// @nodoc
+  @JsonValue(10)
+  routeBluetoothDeviceA2dp,
 }
 
 /// @nodoc
@@ -247,7 +251,7 @@ enum MediaSourceType {
   @JsonValue(2)
   primaryCameraSource,
 
-  /// 3: The secondary camera.
+  /// 3: A secondary camera.
   @JsonValue(3)
   secondaryCameraSource,
 
@@ -259,7 +263,7 @@ enum MediaSourceType {
   @JsonValue(5)
   secondaryScreenSource,
 
-  /// @nodoc
+  /// 6. Custom video source.
   @JsonValue(6)
   customVideoSource,
 
@@ -671,6 +675,33 @@ extension CameraVideoSourceTypeExt on CameraVideoSourceType {
   }
 }
 
+/// @nodoc
+abstract class VideoFrameMetaInfo {
+  /// @nodoc
+  Future<String> getMetaInfoStr(MetaInfoKey key);
+}
+
+/// @nodoc
+@JsonEnum(alwaysCreate: true)
+enum MetaInfoKey {
+  /// @nodoc
+  @JsonValue(0)
+  keyFaceCapture,
+}
+
+/// @nodoc
+extension MetaInfoKeyExt on MetaInfoKey {
+  /// @nodoc
+  static MetaInfoKey fromValue(int value) {
+    return $enumDecode(_$MetaInfoKeyEnumMap, value);
+  }
+
+  /// @nodoc
+  int value() {
+    return _$MetaInfoKeyEnumMap[this]!;
+  }
+}
+
 /// The external video frame.
 @JsonSerializable(explicitToJson: true, includeIfNull: false)
 class ExternalVideoFrame {
@@ -853,7 +884,8 @@ class VideoFrame {
       this.textureId,
       this.matrix,
       this.alphaBuffer,
-      this.pixelBuffer});
+      this.pixelBuffer,
+      this.metaInfo});
 
   /// The pixel format. See VideoPixelFormat.
   @JsonKey(name: 'type')
@@ -927,6 +959,11 @@ class VideoFrame {
   @JsonKey(name: 'pixelBuffer', ignore: true)
   final Uint8List? pixelBuffer;
 
+  /// The meta information in the video frame. To use this parameter, please.
+  @JsonKey(name: 'metaInfo')
+  @VideoFrameMetaInfoConverter()
+  final VideoFrameMetaInfo? metaInfo;
+
   /// @nodoc
   factory VideoFrame.fromJson(Map<String, dynamic> json) =>
       _$VideoFrameFromJson(json);
@@ -967,7 +1004,7 @@ extension MediaPlayerSourceTypeExt on MediaPlayerSourceType {
 /// The frame position of the video observer.
 @JsonEnum(alwaysCreate: true)
 enum VideoModulePosition {
-  /// 1: The post-capturer position, which corresponds to the video data in the onCaptureVideoFrame callback.
+  /// 1: The location of the locally collected video data after preprocessing corresponds to the onCaptureVideoFrame callback. The observed video here has the effect of video pre-processing, which can be verified by enabling image enhancement, virtual background, or watermark.
   @JsonValue(1 << 0)
   positionPostCapturer,
 
@@ -975,9 +1012,15 @@ enum VideoModulePosition {
   @JsonValue(1 << 1)
   positionPreRenderer,
 
-  /// 4: The pre-encoder position, which corresponds to the video data in the onPreEncodeVideoFrame callback.
+  /// 4: The pre-encoder position, which corresponds to the video data in the onPreEncodeVideoFrame callback. The observed video here has the effects of video pre-processing and encoding pre-processing.
+  ///  To verify the pre-processing effects of the video, you can enable image enhancement, virtual background, or watermark.
+  ///  To verify the pre-encoding processing effect, you can set a lower frame rate (for example, 5 fps).
   @JsonValue(1 << 2)
   positionPreEncoder,
+
+  /// 8: The position after local video capture and before pre-processing. The observed video here does not have pre-processing effects, which can be verified by enabling image enhancement, virtual background, or watermarks.
+  @JsonValue(1 << 3)
+  positionPostCapturerOrigin,
 }
 
 /// @nodoc
@@ -1093,7 +1136,8 @@ class AudioFrame {
       this.buffer,
       this.renderTimeMs,
       this.avsyncType,
-      this.presentationMs});
+      this.presentationMs,
+      this.audioTrackNumber});
 
   /// The type of the audio frame. See AudioFrameType.
   @JsonKey(name: 'type')
@@ -1132,6 +1176,10 @@ class AudioFrame {
   /// @nodoc
   @JsonKey(name: 'presentationMs')
   final int? presentationMs;
+
+  /// @nodoc
+  @JsonKey(name: 'audioTrackNumber')
+  final int? audioTrackNumber;
 
   /// @nodoc
   factory AudioFrame.fromJson(Map<String, dynamic> json) =>
@@ -1364,16 +1412,16 @@ class VideoFrameObserver {
   /// Occurs each time the SDK receives a video frame captured by local devices.
   ///
   /// After you successfully register the video frame observer, the SDK triggers this callback each time it receives a video frame. In this callback, you can get the video data captured by local devices. You can then pre-process the data according to your scenarios.
-  ///  The video data that this callback gets has not been pre-processed, and is not watermarked, cropped, rotated or beautified.
+  ///  The video data that this callback gets has not been pre-processed such as watermarking, cropping, and rotating.
   ///  If the video data type you get is RGBA, the SDK does not support processing the data of the alpha channel.
   ///  Due to the limitations of Flutter, this callback does not support sending processed video data back to the SDK.
   ///
   /// * [sourceType] Video source types, including cameras, screens, or media player. See VideoSourceType.
   /// * [videoFrame] The video frame. See VideoFrame. The default value of the video frame data format obtained through this callback is as follows:
-  ///  Android: texture
-  ///  iOS: cvPixelBuffer
-  ///  macOS: YUV 420
-  ///  Windows: YUV 420
+  ///  Android: I420 or RGB (GLES20.GL_TEXTURE_2D)
+  ///  iOS: I420 or CVPixelBufferRef
+  ///  macOS: I420 or CVPixelBufferRef
+  ///  Windows: YUV420
   final void Function(VideoSourceType sourceType, VideoFrame videoFrame)?
       onCaptureVideoFrame;
 
@@ -1384,10 +1432,10 @@ class VideoFrameObserver {
   ///  The video data that this callback gets has been preprocessed, with its content cropped and rotated, and the image enhanced.
   ///
   /// * [videoFrame] The video frame. See VideoFrame. The default value of the video frame data format obtained through this callback is as follows:
-  ///  Android: texture
-  ///  iOS: cvPixelBuffer
-  ///  macOS: YUV 420
-  ///  Windows: YUV 420
+  ///  Android: I420 or RGB (GLES20.GL_TEXTURE_2D)
+  ///  iOS: I420 or CVPixelBufferRef
+  ///  macOS: I420 or CVPixelBufferRef
+  ///  Windows: YUV420
   /// * [sourceType] The type of the video source. See VideoSourceType.
   final void Function(VideoSourceType sourceType, VideoFrame videoFrame)?
       onPreEncodeVideoFrame;
@@ -1403,10 +1451,10 @@ class VideoFrameObserver {
   ///  Due to the limitations of Flutter, this callback does not support sending processed video data back to the SDK.
   ///
   /// * [videoFrame] The video frame. See VideoFrame. The default value of the video frame data format obtained through this callback is as follows:
-  ///  Android: texture
-  ///  iOS: cvPixelBuffer
-  ///  macOS: YUV 420
-  ///  Windows: YUV 420
+  ///  Android: I420 or RGB (GLES20.GL_TEXTURE_2D)
+  ///  iOS: I420 or CVPixelBufferRef
+  ///  macOS: I420 or CVPixelBufferRef
+  ///  Windows: YUV420
   /// * [remoteUid] The user ID of the remote user who sends the current video frame.
   /// * [channelId] The channel ID.
   final void Function(String channelId, int remoteUid, VideoFrame videoFrame)?
@@ -1519,7 +1567,7 @@ extension MediaRecorderStreamTypeExt on MediaRecorderStreamType {
 /// The current recording state.
 @JsonEnum(alwaysCreate: true)
 enum RecorderState {
-  /// -1: An error occurs during the recording. See RecorderErrorCode for the reason.
+  /// -1: An error occurs during the recording. See RecorderReasonCode for the reason.
   @JsonValue(-1)
   recorderStateError,
 
@@ -1547,38 +1595,38 @@ extension RecorderStateExt on RecorderState {
 
 /// The reason for the state change.
 @JsonEnum(alwaysCreate: true)
-enum RecorderErrorCode {
+enum RecorderReasonCode {
   /// 0: No error.
   @JsonValue(0)
-  recorderErrorNone,
+  recorderReasonNone,
 
   /// 1: The SDK fails to write the recorded data to a file.
   @JsonValue(1)
-  recorderErrorWriteFailed,
+  recorderReasonWriteFailed,
 
   /// 2: The SDK does not detect any audio and video streams, or audio and video streams are interrupted for more than five seconds during recording.
   @JsonValue(2)
-  recorderErrorNoStream,
+  recorderReasonNoStream,
 
   /// 3: The recording duration exceeds the upper limit.
   @JsonValue(3)
-  recorderErrorOverMaxDuration,
+  recorderReasonOverMaxDuration,
 
   /// 4: The recording configuration changes.
   @JsonValue(4)
-  recorderErrorConfigChanged,
+  recorderReasonConfigChanged,
 }
 
 /// @nodoc
-extension RecorderErrorCodeExt on RecorderErrorCode {
+extension RecorderReasonCodeExt on RecorderReasonCode {
   /// @nodoc
-  static RecorderErrorCode fromValue(int value) {
-    return $enumDecode(_$RecorderErrorCodeEnumMap, value);
+  static RecorderReasonCode fromValue(int value) {
+    return $enumDecode(_$RecorderReasonCodeEnumMap, value);
   }
 
   /// @nodoc
   int value() {
-    return _$RecorderErrorCodeEnumMap[this]!;
+    return _$RecorderReasonCodeEnumMap[this]!;
   }
 }
 
@@ -1657,7 +1705,7 @@ class MediaRecorderObserver {
 
   /// @nodoc
   final void Function(String channelId, int uid, RecorderState state,
-      RecorderErrorCode error)? onRecorderStateChanged;
+      RecorderReasonCode reason)? onRecorderStateChanged;
 
   /// @nodoc
   final void Function(String channelId, int uid, RecorderInfo info)?

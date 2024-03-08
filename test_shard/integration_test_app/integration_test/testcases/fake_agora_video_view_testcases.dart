@@ -119,6 +119,69 @@ class FakeGlobalVideoViewController {
   }
 }
 
+class FakeMethodChannelController {
+  FakeMethodChannelController(this.rtcEngine, this.testDefaultBinaryMessenger) {
+    const videoViewControllerChannel =
+        MethodChannel('agora_rtc_ng/video_view_controller');
+    mockedMethodChannels.add(videoViewControllerChannel);
+    testDefaultBinaryMessenger
+        .setMockMethodCallHandler(videoViewControllerChannel, ((message) async {
+      methodCallQueue.add(message);
+
+      if (message.method == 'createTextureRender') {
+        final t = textrueId++;
+        final channelId = 'agora_rtc_engine/texture_render_$t';
+        final c = MethodChannel(channelId);
+        testDefaultBinaryMessenger.setMockMethodCallHandler(c, (message) async {
+          return 0;
+        });
+
+        mockedMethodChannels.add(c);
+        // Need a delay to ensure the channel `agora_rtc_engine/texture_render_xx` is registered.
+        Future.delayed(const Duration(milliseconds: 100), () {
+          triggerPlatformMessage(channelId,
+              const MethodCall('onSizeChanged', {'width': 50, 'height': 50}));
+        });
+        return t;
+      }
+
+      return 0;
+    }));
+  }
+
+  final RtcEngine rtcEngine;
+
+  final TestDefaultBinaryMessenger testDefaultBinaryMessenger;
+
+  final List<MethodCall> methodCallQueue = [];
+
+  final List<MethodChannel> mockedMethodChannels = [];
+
+  int textrueId = 0;
+
+  void reset() {
+    methodCallQueue.clear();
+    textrueId = 0;
+  }
+
+  void dispose() {
+    for (final c in mockedMethodChannels) {
+      testDefaultBinaryMessenger.setMockMethodCallHandler(c, null);
+    }
+    reset();
+  }
+
+  void triggerPlatformMessage(String channelId, MethodCall methodCall) async {
+    const StandardMethodCodec codec = StandardMethodCodec();
+    final ByteData data = codec.encodeMethodCall(methodCall);
+    await testDefaultBinaryMessenger.handlePlatformMessage(
+      channelId,
+      data,
+      (ByteData? data) {},
+    );
+  }
+}
+
 void testCases() {
   group('Test with FakeIrisMethodChannel', () {
     final FakeIrisMethodChannel irisMethodChannel =
@@ -166,7 +229,7 @@ void testCases() {
             await videoViewCreatedCompleter.future;
 
             final setupLocalVideoCalls = irisMethodChannel.methodCallQueue
-                .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                .where((e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                 .toList();
 
             final jsonMap2 = jsonDecode(setupLocalVideoCalls[0].params);
@@ -182,7 +245,7 @@ void testCases() {
 
             // Check `VideoViewControllerBaseMixin`'s `disposeRender` called
             final disposeLocalVideoCalls = irisMethodChannel.methodCallQueue
-                .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                .where((e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                 .toList();
 
             final disposeLocalVideoCallsJsonMap =
@@ -231,7 +294,8 @@ void testCases() {
               await videoViewCreatedCompleter.future;
 
               final setupLocalVideoCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                  .where(
+                      (e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                   .toList();
 
               final jsonMap2 = jsonDecode(setupLocalVideoCalls[0].params);
@@ -247,7 +311,8 @@ void testCases() {
 
               // Check `VideoViewControllerBaseMixin`'s `disposeRender` called
               final disposeLocalVideoCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                  .where(
+                      (e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                   .toList();
 
               final disposeLocalVideoCallsJsonMap =
@@ -293,7 +358,8 @@ void testCases() {
             // Check `setupLocalVideo` calls
             {
               final setupLocalVideoCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                  .where(
+                      (e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                   .toList();
 
               final jsonMap2 = jsonDecode(setupLocalVideoCalls[0].params);
@@ -353,7 +419,8 @@ void testCases() {
             // Check `setupRemoteVideoEx` calls
             {
               final setupRemoteVideoExCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngineEx_setupRemoteVideoEx')
+                  .where((e) =>
+                      e.funcName == 'RtcEngineEx_setupRemoteVideoEx_522a409')
                   .toList();
 
               final jsonMap1 = jsonDecode(setupRemoteVideoExCalls[0].params);
@@ -408,7 +475,8 @@ void testCases() {
             // Check `setupLocalVideo` calls
             {
               final setupLocalVideoCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngine_setupLocalVideo')
+                  .where(
+                      (e) => e.funcName == 'RtcEngine_setupLocalVideo_acc9c38')
                   .toList();
 
               final jsonMap1 = jsonDecode(setupLocalVideoCalls[0].params);
@@ -421,7 +489,8 @@ void testCases() {
             // Check `setupRemoteVideoEx` calls
             {
               final setupRemoteVideoExCalls = irisMethodChannel.methodCallQueue
-                  .where((e) => e.funcName == 'RtcEngineEx_setupRemoteVideoEx')
+                  .where((e) =>
+                      e.funcName == 'RtcEngineEx_setupRemoteVideoEx_522a409')
                   .toList();
 
               final jsonMap1 = jsonDecode(setupRemoteVideoExCalls[0].params);
@@ -440,262 +509,400 @@ void testCases() {
       skip: !(Platform.isAndroid || Platform.isIOS),
     );
 
-    // TODO(littlegnal): The texture rendering test case are crash, since it need to call the
-    // real `IrisMethodChannel` implementation, but not just implement a fake `GlobalVideoViewController`.
-    // Need figure it out how to re-enable these test cases it the future.
-    //
-    // group(
-    //   'Texture Rendering',
-    //   () {
-    //     testWidgets(
-    //       'Show local AgoraVideoView after RtcEngine.initialize',
-    //       (WidgetTester tester) async {
-    //         late FakeGlobalVideoViewController fakeGlobalVideoViewController;
+    group(
+      'Texture Rendering',
+      () {
+        testWidgets(
+          'Show local AgoraVideoView after RtcEngine.initialize',
+          (WidgetTester tester) async {
+            late FakeMethodChannelController fakeMethodChannelController;
+            fakeMethodChannelController = FakeMethodChannelController(
+              rtcEngine,
+              tester.binding.defaultBinaryMessenger,
+            );
 
-    //         final videoViewCreatedCompleter = Completer<void>();
+            final videoViewCreatedCompleter = Completer<void>();
 
-    //         print('1111');
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return SizedBox(
+                  height: 100,
+                  width: 100,
+                  child: AgoraVideoView(
+                    controller: VideoViewController(
+                      rtcEngine: engine,
+                      canvas: const VideoCanvas(uid: 0),
+                      useFlutterTexture: true,
+                    ),
+                    onAgoraVideoViewCreated: (viewId) {
+                      if (!videoViewCreatedCompleter.isCompleted) {
+                        videoViewCreatedCompleter.complete(null);
+                      }
+                    },
+                  ),
+                );
+              },
+            ));
 
-    //         await tester.pumpWidget(_RenderViewWidget(
-    //           rtcEngine: rtcEngine,
-    //           onRtcEngineInitialized: () {
-    //             fakeGlobalVideoViewController = FakeGlobalVideoViewController(
-    //               rtcEngine,
-    //               tester.binding.defaultBinaryMessenger,
-    //             );
-    //           },
-    //           builder: (context, engine) {
-    //             return SizedBox(
-    //               height: 100,
-    //               width: 100,
-    //               child: AgoraVideoView(
-    //                 controller: VideoViewController(
-    //                   rtcEngine: engine,
-    //                   canvas: const VideoCanvas(uid: 0),
-    //                   useFlutterTexture: true,
-    //                 ),
-    //                 onAgoraVideoViewCreated: (viewId) {
-    //                   if (!videoViewCreatedCompleter.isCompleted) {
-    //                     videoViewCreatedCompleter.complete(null);
-    //                   }
-    //                 },
-    //               ),
-    //             );
-    //           },
-    //         ));
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // pumpAndSettle again to ensure the `AgoraVideoView` shown
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
 
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
-    //         // pumpAndSettle again to ensure the `AgoraVideoView` shown
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            await videoViewCreatedCompleter.future;
 
-    //         await videoViewCreatedCompleter.future;
+            {
+              final createTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'createTextureRender')
+                  .toList();
 
-    //         print('videoViewCreatedCompleter.future completed');
+              final createTextureRenderArg = Map<String, Object>.from(
+                  createTextureRenderCalls[0].arguments);
 
-    //         {
-    //           final createTextureRenderCalls = fakeGlobalVideoViewController
-    //               .methodCallQueue
-    //               .where((e) => e.method == 'createTextureRender')
-    //               .toList();
+              expect(createTextureRenderArg['uid'] == 0, isTrue);
 
-    //           final createTextureRenderArg = Map<String, Object>.from(
-    //               createTextureRenderCalls[0].arguments);
+              int textureId = -1;
+              expect(find.byWidgetPredicate((widget) {
+                final found = widget is Texture;
+                if (found) {
+                  textureId = (widget as Texture).textureId;
+                }
+                return found;
+              }), findsOneWidget);
+              // The first textureId is 0
+              expect(textureId == 0, isTrue);
+            }
 
-    //           expect(createTextureRenderArg['uid'] == 0, isTrue);
-    //         }
+            fakeMethodChannelController.reset();
 
-    //         fakeGlobalVideoViewController.reset();
+            await tester.pumpWidget(Container());
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
 
-    //         await tester.pumpWidget(Container());
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // Delay 5 seconds to ensure that previous Widget.dipose call completed.
+            await Future.delayed(const Duration(seconds: 5));
 
-    //         // Delay 5 seconds to ensure that previous Widget.dipose call completed.
-    //         await Future.delayed(const Duration(seconds: 5));
+            {
+              final disposeTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'destroyTextureRender')
+                  .toList();
 
-    //         {
-    //           final disposeTextureRenderCalls = fakeGlobalVideoViewController
-    //               .methodCallQueue
-    //               .where((e) => e.method == 'destroyTextureRender')
-    //               .toList();
+              // texture id
+              final disposeTextureRenderTextureId =
+                  disposeTextureRenderCalls[0].arguments as int;
 
-    //           // texture id
-    //           final disposeTextureRenderTextureId =
-    //               disposeTextureRenderCalls[0].arguments as int;
+              expect(disposeTextureRenderTextureId != -1, isTrue);
+            }
 
-    //           expect(disposeTextureRenderTextureId != 0, isTrue);
-    //         }
+            fakeMethodChannelController.dispose();
+          },
+        );
 
-    //         fakeGlobalVideoViewController.dispose();
-    //       },
-    //     );
+        testWidgets(
+          'Show local AgoraVideoView after udpate the widget multiple times',
+          (WidgetTester tester) async {
+            final fakeMethodChannelController = FakeMethodChannelController(
+              rtcEngine,
+              tester.binding.defaultBinaryMessenger,
+            );
 
-    //     testWidgets(
-    //       'Switch local/remote AgoraVideoView with RtcConnection',
-    //       (WidgetTester tester) async {
-    //         // This case run this following steps:
-    //         // 1. Show a local `AgoraVideoView`.
-    //         // 2. Show local and remote `AgoraVideoView`, this step will trigger the `State.didUpdateWidget`.
-    //         // 3. Switch the local and remote `AgoraVideoView`.
+            Completer<void> videoViewCreatedCompleter = Completer<void>();
 
-    //         late FakeGlobalVideoViewController fakeGlobalVideoViewController;
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return SizedBox(
+                  height: 100,
+                  width: 100,
+                  child: AgoraVideoView(
+                    controller: VideoViewController(
+                      rtcEngine: engine,
+                      canvas: const VideoCanvas(uid: 0),
+                      useFlutterTexture: true,
+                    ),
+                    onAgoraVideoViewCreated: (viewId) {
+                      if (!videoViewCreatedCompleter.isCompleted) {
+                        videoViewCreatedCompleter.complete(null);
+                      }
+                    },
+                  ),
+                );
+              },
+            ));
 
-    //         await tester.pumpWidget(_RenderViewWidget(
-    //           rtcEngine: rtcEngine,
-    //           onRtcEngineInitialized: () {
-    //             fakeGlobalVideoViewController = FakeGlobalVideoViewController(
-    //               rtcEngine,
-    //               tester.binding.defaultBinaryMessenger,
-    //             );
-    //           },
-    //           builder: (context, engine) {
-    //             return Column(
-    //               children: [
-    //                 SizedBox(
-    //                   height: 100,
-    //                   width: 100,
-    //                   child: AgoraVideoView(
-    //                     controller: VideoViewController(
-    //                       rtcEngine: engine,
-    //                       canvas: const VideoCanvas(uid: 0),
-    //                       useFlutterTexture: true,
-    //                     ),
-    //                   ),
-    //                 )
-    //               ],
-    //             );
-    //           },
-    //         ));
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // pumpAndSettle again to ensure the `AgoraVideoView` shown
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
 
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
-    //         // pumpAndSettle again to ensure the `AgoraVideoView` shown
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            await videoViewCreatedCompleter.future;
 
-    //         // Check `GlobalVideoViewController.createTextureRender` calls
-    //         {
-    //           final createTextureRenderCalls = fakeGlobalVideoViewController
-    //               .methodCallQueue
-    //               .where((e) => e.method == 'createTextureRender')
-    //               .toList();
+            {
+              int textureId = -1;
+              expect(find.byWidgetPredicate((widget) {
+                final found = widget is Texture;
+                if (found) {
+                  textureId = (widget as Texture).textureId;
+                }
+                return found;
+              }), findsOneWidget);
+              // The first textureId is 0
+              expect(textureId == 0, isTrue);
+            }
 
-    //           final createTextureRenderArg = Map<String, Object>.from(
-    //               createTextureRenderCalls[0].arguments);
+            videoViewCreatedCompleter = Completer<void>();
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return SizedBox(
+                  height: 100,
+                  width: 100,
+                  child: AgoraVideoView(
+                    controller: VideoViewController(
+                      rtcEngine: engine,
+                      canvas: const VideoCanvas(uid: 0),
+                      useFlutterTexture: true,
+                    ),
+                    onAgoraVideoViewCreated: (viewId) {
+                      if (!videoViewCreatedCompleter.isCompleted) {
+                        videoViewCreatedCompleter.complete(null);
+                      }
+                    },
+                  ),
+                );
+              },
+            ));
 
-    //           expect(createTextureRenderArg['uid'] == 0, isTrue);
-    //         }
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // pumpAndSettle again to ensure the `AgoraVideoView` shown
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
 
-    //         // Clear the methodCall records
-    //         fakeGlobalVideoViewController.reset();
+            {
+              final createTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'createTextureRender')
+                  .toList();
+              expect(createTextureRenderCalls.length == 1, isTrue);
 
-    //         // This step will call `didUpdateWidget`
-    //         await tester.pumpWidget(_RenderViewWidget(
-    //           rtcEngine: rtcEngine,
-    //           builder: (context, engine) {
-    //             return Column(
-    //               children: [
-    //                 SizedBox(
-    //                   height: 100,
-    //                   width: 100,
-    //                   child: AgoraVideoView(
-    //                     controller: VideoViewController(
-    //                       rtcEngine: engine,
-    //                       canvas: const VideoCanvas(uid: 0),
-    //                       useFlutterTexture: true,
-    //                     ),
-    //                   ),
-    //                 ),
-    //                 SizedBox(
-    //                   height: 100,
-    //                   width: 100,
-    //                   child: AgoraVideoView(
-    //                     controller: VideoViewController.remote(
-    //                       rtcEngine: engine,
-    //                       canvas: const VideoCanvas(uid: 1000),
-    //                       connection: const RtcConnection(
-    //                         channelId: 'switch_video_view',
-    //                         localUid: 1000,
-    //                       ),
-    //                       useFlutterTexture: true,
-    //                     ),
-    //                   ),
-    //                 )
-    //               ],
-    //             );
-    //           },
-    //         ));
+              int textureId = -1;
+              expect(find.byWidgetPredicate((widget) {
+                final found = widget is Texture;
+                if (found) {
+                  textureId = (widget as Texture).textureId;
+                }
+                return found;
+              }), findsOneWidget);
+              // The first textureId is 0
+              expect(textureId == 0, isTrue);
+            }
 
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
-    //         // pumpAndSettle again to ensure the `AgoraVideoView` shown
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            fakeMethodChannelController.dispose();
+          },
+        );
 
-    //         // Check `GlobalVideoViewController.createTextureRender` calls for remote `AgoraVideoView`
-    //         {
-    //           final createTextureRenderCalls = fakeGlobalVideoViewController
-    //               .methodCallQueue
-    //               .where((e) => e.method == 'createTextureRender')
-    //               .toList();
+        testWidgets(
+          'Switch local/remote AgoraVideoView with RtcConnection',
+          (WidgetTester tester) async {
+            // This case run this following steps:
+            // 1. Show a local `AgoraVideoView`.
+            // 2. Show local and remote `AgoraVideoView`, this step will trigger the `State.didUpdateWidget`.
+            // 3. Switch the local and remote `AgoraVideoView`.
 
-    //           final createTextureRenderArg = Map<String, Object>.from(
-    //               createTextureRenderCalls[0].arguments);
+            final fakeMethodChannelController = FakeMethodChannelController(
+              rtcEngine,
+              tester.binding.defaultBinaryMessenger,
+            );
 
-    //           expect(createTextureRenderArg['uid'] != 0, isTrue);
-    //         }
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: AgoraVideoView(
+                        controller: VideoViewController(
+                          rtcEngine: engine,
+                          canvas: const VideoCanvas(uid: 0),
+                          useFlutterTexture: true,
+                        ),
+                      ),
+                    )
+                  ],
+                );
+              },
+            ));
 
-    //         // Clear the methodCall records
-    //         fakeGlobalVideoViewController.reset();
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // pumpAndSettle again to ensure the `AgoraVideoView` shown
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
 
-    //         await tester.pumpWidget(_RenderViewWidget(
-    //           rtcEngine: rtcEngine,
-    //           builder: (context, engine) {
-    //             return Column(
-    //               children: [
-    //                 SizedBox(
-    //                   height: 100,
-    //                   width: 100,
-    //                   child: AgoraVideoView(
-    //                     controller: VideoViewController.remote(
-    //                       rtcEngine: engine,
-    //                       canvas: const VideoCanvas(uid: 1000),
-    //                       connection: const RtcConnection(
-    //                         channelId: 'switch_video_view',
-    //                         localUid: 1000,
-    //                       ),
-    //                       useFlutterTexture: true,
-    //                     ),
-    //                   ),
-    //                 ),
-    //                 SizedBox(
-    //                   height: 100,
-    //                   width: 100,
-    //                   child: AgoraVideoView(
-    //                     controller: VideoViewController(
-    //                       rtcEngine: engine,
-    //                       canvas: const VideoCanvas(uid: 0),
-    //                       useFlutterTexture: true,
-    //                     ),
-    //                   ),
-    //                 )
-    //               ],
-    //             );
-    //           },
-    //         ));
+            // Check `GlobalVideoViewController.createTextureRender` calls
+            {
+              final createTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'createTextureRender')
+                  .toList();
 
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+              final createTextureRenderArg = Map<String, Object>.from(
+                  createTextureRenderCalls[0].arguments);
 
-    //         // When switch the local and remote `AgoraVideoView`, which will trigger the
-    //         // `State.didUpdateWidget`, so there're no method call records here.
-    //         expect(
-    //             fakeGlobalVideoViewController.methodCallQueue.isEmpty, isTrue);
+              expect(createTextureRenderArg['uid'] == 0, isTrue);
+            }
 
-    //         fakeGlobalVideoViewController.dispose();
+            // This step will call `didUpdateWidget`
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: AgoraVideoView(
+                        controller: VideoViewController(
+                          rtcEngine: engine,
+                          canvas: const VideoCanvas(uid: 0),
+                          useFlutterTexture: true,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: AgoraVideoView(
+                        controller: VideoViewController.remote(
+                          rtcEngine: engine,
+                          canvas: const VideoCanvas(uid: 1000),
+                          connection: const RtcConnection(
+                            channelId: 'switch_video_view',
+                            localUid: 1000,
+                          ),
+                          useFlutterTexture: true,
+                        ),
+                      ),
+                    )
+                  ],
+                );
+              },
+            ));
 
-    //         await tester.pumpWidget(Container());
-    //         await tester.pumpAndSettle(const Duration(milliseconds: 5000));
-    //         await Future.delayed(const Duration(seconds: 5));
-    //       },
-    //     );
-    //   },
-    //   skip: Platform.isAndroid,
-    // );
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            // pumpAndSettle again to ensure the `AgoraVideoView` shown
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+
+            // Check `GlobalVideoViewController.createTextureRender` calls for remote `AgoraVideoView`
+            {
+              final createTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'createTextureRender')
+                  .toList();
+
+              expect(createTextureRenderCalls.length == 2, isTrue);
+
+              final createTextureRenderArg = Map<String, Object>.from(
+                  createTextureRenderCalls[1].arguments);
+
+              expect(createTextureRenderArg['uid'] != 0, isTrue);
+
+              {
+                List<int> textureIds = [];
+                expect(find.byWidgetPredicate((widget) {
+                  final found = widget is Texture;
+                  if (found) {
+                    // textureId = (widget as Texture).textureId;
+                    textureIds.add((widget as Texture).textureId);
+                  }
+                  return found;
+                }), findsNWidgets(2));
+                // The first textureId is 0
+                expect(textureIds[0] == 0, isTrue);
+                // The second textureId is 0
+                expect(textureIds[1] == 1, isTrue);
+              }
+            }
+
+            await tester.pumpWidget(_RenderViewWidget(
+              rtcEngine: rtcEngine,
+              builder: (context, engine) {
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: AgoraVideoView(
+                        controller: VideoViewController.remote(
+                          rtcEngine: engine,
+                          canvas: const VideoCanvas(uid: 1000),
+                          connection: const RtcConnection(
+                            channelId: 'switch_video_view',
+                            localUid: 1000,
+                          ),
+                          useFlutterTexture: true,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      height: 100,
+                      width: 100,
+                      child: AgoraVideoView(
+                        controller: VideoViewController(
+                          rtcEngine: engine,
+                          canvas: const VideoCanvas(uid: 0),
+                          useFlutterTexture: true,
+                        ),
+                      ),
+                    )
+                  ],
+                );
+              },
+            ));
+
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+
+            {
+              final createTextureRenderCalls = fakeMethodChannelController
+                  .methodCallQueue
+                  .where((e) => e.method == 'createTextureRender')
+                  .toList();
+
+              // After `didUpdateWidget` called, the texture renderer will be re-created,
+              // so there're another 2 times' `createTextureRender` are called.
+              // So the value of `createTextureRenderCalls.length` is 4
+              expect(createTextureRenderCalls.length == 4, isTrue);
+
+              final createTextureRenderArg = Map<String, Object>.from(
+                  createTextureRenderCalls[2].arguments);
+
+              expect(createTextureRenderArg['uid'] != 0, isTrue);
+
+              {
+                List<int> textureIds = [];
+                expect(find.byWidgetPredicate((widget) {
+                  final found = widget is Texture;
+                  if (found) {
+                    // textureId = (widget as Texture).textureId;
+                    textureIds.add((widget as Texture).textureId);
+                  }
+                  return found;
+                }), findsNWidgets(2));
+                // The third textureId is 2
+                expect(textureIds[0] == 2, isTrue);
+                // The fourth textureId is 3
+                expect(textureIds[1] == 3, isTrue);
+              }
+            }
+
+            fakeMethodChannelController.dispose();
+
+            await tester.pumpWidget(Container());
+            await tester.pumpAndSettle(const Duration(milliseconds: 5000));
+            await Future.delayed(const Duration(seconds: 5));
+          },
+        );
+      },
+    );
 
     testWidgets(
       'dispose AgoraVideoView not crash before setupLocalVideo/setupRemoteVideo[Ex] call is completed',
@@ -711,7 +918,7 @@ void testCases() {
           isFakeRemoveHotRestartListener: false,
           isFakeDispose: false,
           delayInvokeMethod: {
-            'RtcEngine_setupLocalVideo': 5000
+            'RtcEngine_setupLocalVideo_acc9c38': 5000
           }, // delay the `RtcEngine_setupLocalVideo` to 5s, make it complete after `Widget.dispose` more easier
         );
 

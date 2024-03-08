@@ -32,16 +32,36 @@ typedef enum IrisAppType {
 } IrisAppType;
 
 typedef enum IrisLogLevel {
-  LOG_LEVEL_TRACE = 0,
-  LOG_LEVEL_DEBUG = 1,
-  LOG_LEVEL_INFO = 2,
-  LOG_LEVEL_WARN = 3,
-  LOG_LEVEL_ERROR = 4,
-  LOG_LEVEL_CRITICAL = 5,
-  LOG_LEVEL_OFF = 6,
+  levelDebug = 1,
+  levelInfo = 2,
+  levelWarn = 3,
+  levelErr = 4,
+  levelCritical = 5,
+  levelOff = 6,
 } IrisLogLevel;
 
+typedef enum IrisError {
+  ERR_OK = 0,
+  ERR_FAILED = 1,
+  ERR_INVALID_ARGUMENT = 2,
+  ERR_NOT_SUPPORTED = 4,
+  ERR_NOT_INITIALIZED = 7,
+
+  /*base from IRIS_VIDEO_PROCESS_ERR::ERR_NULL_POINTER=1*/
+  ERR_NULL_POINTER = 1001,
+  ERR_SIZE_NOT_MATCHING = 1002,
+  ERR_BUFFER_EMPTY = 1005,
+  ERR_FRAM_TYPE_NOT_MATCHING = 1006,
+  ERR_ALREADY_REGISTERED = 1007,
+  ERR_ALREADY_UNREGISTERED = 1008,
+  ERR_API_NOT_REGISTERED = 1009,
+} IrisError;
+
 IRIS_API void enableUseJsonArray(bool enable);
+
+void saveAppType(IrisAppType type);
+
+IrisAppType getAppType();
 
 IRIS_API void InitIrisLogger(const char *path, int maxSize, IrisLogLevel level);
 
@@ -63,7 +83,9 @@ typedef struct IrisCEventHandler {
   Func_Event OnEvent;
 } IrisCEventHandler;
 
-typedef void *IrisEventHandlerHandle;
+typedef void *IrisHandle;
+typedef IrisHandle IrisEventHandlerHandle;
+typedef IrisHandle IrisApiEnginePtr;
 
 EXTERN_C_LEAVE
 

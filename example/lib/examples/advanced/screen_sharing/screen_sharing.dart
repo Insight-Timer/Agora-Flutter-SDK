@@ -8,6 +8,7 @@ import 'package:agora_rtc_engine_example/components/remote_video_views_widget.da
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
 
 /// ScreenSharing Example
 class ScreenSharing extends StatefulWidget {
@@ -63,7 +64,7 @@ class _State extends State<ScreenSharing> with KeepRemoteVideoViewsMixin {
         isJoined = false;
       });
     }, onLocalVideoStateChanged: (VideoSourceType source,
-            LocalVideoStreamState state, LocalVideoStreamError error) {
+            LocalVideoStreamState state, LocalVideoStreamReason error) {
       logSink.log(
           '[onLocalVideoStateChanged] source: $source, state: $state, error: $error');
       if (!(source == VideoSourceType.videoSourceScreen ||
@@ -114,6 +115,8 @@ class _State extends State<ScreenSharing> with KeepRemoteVideoViewsMixin {
           connection:
               RtcConnection(channelId: _controller.text, localUid: localUid),
           options: const ChannelMediaOptions(
+            autoSubscribeVideo: true,
+            autoSubscribeAudio: true,
             publishCameraTrack: true,
             publishMicrophoneTrack: true,
             clientRoleType: ClientRoleType.clientRoleBroadcaster,
@@ -127,8 +130,8 @@ class _State extends State<ScreenSharing> with KeepRemoteVideoViewsMixin {
           connection: RtcConnection(
               channelId: _controller.text, localUid: shareShareUid),
           options: const ChannelMediaOptions(
-            autoSubscribeVideo: true,
-            autoSubscribeAudio: true,
+            autoSubscribeVideo: false,
+            autoSubscribeAudio: false,
             publishScreenTrack: true,
             publishSecondaryScreenTrack: true,
             publishCameraTrack: false,
@@ -528,25 +531,28 @@ class _ScreenShareDesktopState extends State<ScreenShareDesktop>
 
   Widget _createDropdownButton() {
     if (_screenCaptureSourceInfos.isEmpty) return Container();
+    ui.PixelFormat format = ui.PixelFormat.rgba8888;
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      // The native sdk return the bgra format on Windows.
+      format = ui.PixelFormat.bgra8888;
+    }
     return DropdownButton<ScreenCaptureSourceInfo>(
         items: _screenCaptureSourceInfos.map((info) {
           Widget image;
           if (info.iconImage!.width! != 0 && info.iconImage!.height! != 0) {
-            image = Image(
-              image: RgbaImage(
-                info.iconImage!.buffer!,
-                width: info.iconImage!.width!,
-                height: info.iconImage!.height!,
-              ),
+            image = RgbaImage(
+              bytes: info.iconImage!.buffer!,
+              width: info.iconImage!.width!,
+              height: info.iconImage!.height!,
+              format: format,
             );
           } else if (info.thumbImage!.width! != 0 &&
               info.thumbImage!.height! != 0) {
-            image = Image(
-              image: RgbaImage(
-                info.thumbImage!.buffer!,
-                width: info.thumbImage!.width!,
-                height: info.thumbImage!.height!,
-              ),
+            image = RgbaImage(
+              bytes: info.thumbImage!.buffer!,
+              width: info.thumbImage!.width!,
+              height: info.thumbImage!.height!,
+              format: format,
             );
           } else {
             image = const SizedBox(
