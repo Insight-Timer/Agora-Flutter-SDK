@@ -86,9 +86,17 @@ class TemplatedGenerator extends DefaultGenerator {
       String output = '';
       String outputFileName = '';
       if (templated is MethoCallTemplatedTestCase) {
+        late Clazz clazz;
+        try {
+          clazz = parseResult.getClazz(templated.className)[0];
+        } catch (e) {
+          stderr.writeln('Can not find the className: ${templated.className}.');
+          rethrow;
+        }
+
         output = generateWithTemplate(
           parseResult: parseResult,
-          clazz: parseResult.getClazz(templated.className)[0],
+          clazz: clazz,
           testCaseTemplate: templated.testCaseTemplate,
           testCasesContentTemplate: templated.testCaseFileTemplate,
           methodInvokeObjectName: templated.methodInvokeObjectName,
@@ -360,10 +368,17 @@ await Future.delayed(const Duration(milliseconds: 500));
         final parameterType = getParamType(parameter);
         if (parameterType == 'Uint8List') {
           pb.writeln(
-              '${getParamType(parameter)} ${parameter.name} = ${parameter.primitiveDefualtValue()};');
+              '${getParamType(parameter)} ${parameter.name} = ${defualtValueOfType(parameter.type)};');
         } else {
-          pb.writeln(
-              'const ${getParamType(parameter)} ${parameter.name} = ${parameter.primitiveDefualtValue()};');
+          if (parameterType.startsWith('List') &&
+              parameter.type.typeArguments.isNotEmpty) {
+            final listBuilderBlock =
+                createListBuilderBlockForList(parseResult, parameter);
+            pb.writeln(listBuilderBlock);
+          } else {
+            pb.writeln(
+                '${getParamType(parameter)} ${parameter.name} = ${defualtValueOfType(parameter.type)};');
+          }
         }
       } else {
         createConstructorInitializerForMethodParameter(

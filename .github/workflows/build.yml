@@ -31,7 +31,7 @@ jobs:
           TOTAL: ${{ steps.analysis.outputs.total }}
           TOTAL_MAX: ${{ steps.analysis.outputs.total_max }}
         run: |
-          if (( $TOTAL < 120 ))
+          if (( $TOTAL_MAX - $TOTAL > 10 ))
           then
             echo Pub Score too low.
             exit 1
@@ -86,7 +86,7 @@ jobs:
     strategy:
       matrix:
         version: ["2.10.5", "3.x"]
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       TEST_APP_ID: ${{ secrets.MY_APP_ID }}
@@ -98,7 +98,11 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ matrix.version }}
-      - run: flutter config --enable-macos-desktop
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: run flutter android integration tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -233,7 +237,6 @@ jobs:
   build_android_ubuntu:
     name: Build Android on Ubuntu
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
-    needs: flutter_codestyle_check
     strategy:
       matrix:
         version: ["2.10.5", "3.x"]
@@ -336,11 +339,10 @@ jobs:
         run: flutter build web
         working-directory: example
 
-  # Run android rendering test in macos is more stable
   rendering_test_android:
     name: Run Flutter Android Rendering Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
-    runs-on: macos-12
+    runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
       TEST_APP_ID: ${{ secrets.MY_APP_ID }}
@@ -378,7 +380,11 @@ jobs:
             --flutter-package-name=agora_rtc_engine \
             --iris-android-cdn-url=${IRIS_CDN_URL_ANDROID} \
             --iris-macos-cdn-url=${IRIS_CDN_URL_MACOS}
-      - run: flutter config --enable-macos-desktop
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
       - name: run flutter android integration tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -389,6 +395,12 @@ jobs:
           heap-size: 4096M
           disk-size: 8192M
           script: bash ci/rendering_test_android.sh
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: android-debug-golden-files
+          path: test_shard/rendering_test/screenshot/*.debug.png
 
   rendering_test_ios:
     name: Run Flutter iOS Rendering Tests
@@ -433,9 +445,9 @@ jobs:
       - run: bash ci/rendering_test_ios.sh
 
       - uses: actions/upload-artifact@v3
-        if: failure()
+        if: always()
         with:
-          name: debug-golden-files-ios
+          name: ios-debug-golden-files
           path: test_shard/rendering_test/screenshot/*.debug.png
 
   rendering_test_macos:
@@ -487,6 +499,11 @@ jobs:
         run: |
           export SAVE_DEBUG_GOLDEN="true"
           bash ci/rendering_test_macos.sh
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: macos-debug-golden-files
+          path: test_shard/rendering_test/screenshot/*.debug.png
 
   rendering_test_windows:
     name: Run Flutter Windows Rendering Tests
@@ -536,15 +553,18 @@ jobs:
           export SAVE_DEBUG_GOLDEN="true"
 
           bash ci/rendering_test_windows.sh
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: windows-debug-golden-files
+          path: test_shard/rendering_test/screenshot/*.debug.png
 
   rendering_test_web:
     name: Run Flutter Web Rendering Tests
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'ci:skip') }}
     strategy:
       matrix:
-        # TODO(littlegnal): Temporily pin the Flutter SDK version to 3.16, since the rendering on web not work correct after 3.16, 
-        # see https://github.com/AgoraIO-Extensions/Agora-Flutter-SDK/actions/runs/7958003510/job/21721962323?pr=1572
-        version: ['3.16']
+        version: ['3.x']
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -564,7 +584,7 @@ jobs:
           bash ci/run_rendering_test.sh web
 
       - uses: actions/upload-artifact@v3
-        if: failure()
+        if: always()
         with:
-          name: debug-golden-files
+          name: web-debug-golden-files
           path: test_shard/rendering_test/screenshot/*.debug.png

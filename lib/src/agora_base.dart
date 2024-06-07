@@ -335,13 +335,17 @@ enum ErrorCodeType {
   @JsonValue(119)
   errSetClientRoleNotAuthorized,
 
-  /// 120: Decryption fails. The user might have entered an incorrect password to join the channel. Check the entered password, or tell the user to try rejoining the channel.
+  /// 120: Media streams decryption fails. The user might use an incorrect password to join the channel. Check the entered password, or tell the user to try rejoining the channel.
   @JsonValue(120)
   errDecryptionFailed,
 
   /// 121: The user ID is invalid.
   @JsonValue(121)
   errInvalidUserId,
+
+  /// 122: Data streams decryption fails. The user might use an incorrect password to join the channel. Check the entered password, or tell the user to try rejoining the channel.
+  @JsonValue(122)
+  errDatastreamDecryptionFailed,
 
   /// 123: The user is banned from the server.
   @JsonValue(123)
@@ -583,11 +587,11 @@ extension UserOfflineReasonTypeExt on UserOfflineReasonType {
 /// The interface class.
 @JsonEnum(alwaysCreate: true)
 enum InterfaceIdType {
-  /// The AudioDeviceManager interface class.
+  /// 1: The AudioDeviceManager interface class.
   @JsonValue(1)
   agoraIidAudioDeviceManager,
 
-  /// The VideoDeviceManager interface class.
+  /// 2: The VideoDeviceManager interface class.
   @JsonValue(2)
   agoraIidVideoDeviceManager,
 
@@ -595,7 +599,7 @@ enum InterfaceIdType {
   @JsonValue(3)
   agoraIidParameterEngine,
 
-  /// The MediaEngine interface class.
+  /// 4: The MediaEngine interface class.
   @JsonValue(4)
   agoraIidMediaEngine,
 
@@ -1113,6 +1117,41 @@ extension VideoCodecTypeExt on VideoCodecType {
   }
 }
 
+/// The camera focal length types.
+///
+/// This enumeration class applies to Android and iOS only.
+@JsonEnum(alwaysCreate: true)
+enum CameraFocalLengthType {
+  /// 0: (Default) Standard lens.
+  @JsonValue(0)
+  cameraFocalLengthDefault,
+
+  /// 1: Wide-angle lens.
+  @JsonValue(1)
+  cameraFocalLengthWideAngle,
+
+  /// 2: Ultra-wide-angle lens.
+  @JsonValue(2)
+  cameraFocalLengthUltraWide,
+
+  /// 3: (For iOS only) Telephoto lens.
+  @JsonValue(3)
+  cameraFocalLengthTelephoto,
+}
+
+/// @nodoc
+extension CameraFocalLengthTypeExt on CameraFocalLengthType {
+  /// @nodoc
+  static CameraFocalLengthType fromValue(int value) {
+    return $enumDecode(_$CameraFocalLengthTypeEnumMap, value);
+  }
+
+  /// @nodoc
+  int value() {
+    return _$CameraFocalLengthTypeEnumMap[this]!;
+  }
+}
+
 /// @nodoc
 @JsonEnum(alwaysCreate: true)
 enum TCcMode {
@@ -1518,7 +1557,8 @@ class EncodedVideoFrameInfo {
       this.trackId,
       this.captureTimeMs,
       this.decodeTimeMs,
-      this.streamType});
+      this.streamType,
+      this.presentationMs});
 
   /// The user ID to push the externally encoded video frame.
   @JsonKey(name: 'uid')
@@ -1563,6 +1603,10 @@ class EncodedVideoFrameInfo {
   /// The type of video streams. See VideoStreamType.
   @JsonKey(name: 'streamType')
   final VideoStreamType? streamType;
+
+  /// @nodoc
+  @JsonKey(name: 'presentationMs')
+  final int? presentationMs;
 
   /// @nodoc
   factory EncodedVideoFrameInfo.fromJson(Map<String, dynamic> json) =>
@@ -1679,7 +1723,7 @@ extension VideoMirrorModeTypeExt on VideoMirrorModeType {
   }
 }
 
-/// The bit mask that indicates the device codec capability.
+/// The bit mask of the codec type.
 @JsonEnum(alwaysCreate: true)
 enum CodecCapMask {
   /// (0): The device does not support encoding or decoding.
@@ -1738,7 +1782,7 @@ class CodecCapLevels {
   Map<String, dynamic> toJson() => _$CodecCapLevelsToJson(this);
 }
 
-/// The codec capability of the device.
+/// The codec capability of the SDK.
 @JsonSerializable(explicitToJson: true, includeIfNull: false)
 class CodecCapInfo {
   /// @nodoc
@@ -1748,11 +1792,11 @@ class CodecCapInfo {
   @JsonKey(name: 'codecType')
   final VideoCodecType? codecType;
 
-  /// The bit mask of the codec type. See CodecCapMask.
+  /// Bit mask of the codec types in SDK. See CodecCapMask.
   @JsonKey(name: 'codecCapMask')
   final int? codecCapMask;
 
-  /// The level of the codec capability. See CodecCapLevels.
+  /// Codec capability of the SDK. See CodecCapLevels.
   @JsonKey(name: 'codecLevels')
   final CodecCapLevels? codecLevels;
 
@@ -1762,6 +1806,30 @@ class CodecCapInfo {
 
   /// @nodoc
   Map<String, dynamic> toJson() => _$CodecCapInfoToJson(this);
+}
+
+/// Focal length information supported by the camera, including the camera direction and focal length type.
+///
+/// This enumeration class applies to Android and iOS only.
+@JsonSerializable(explicitToJson: true, includeIfNull: false)
+class FocalLengthInfo {
+  /// @nodoc
+  const FocalLengthInfo({this.cameraDirection, this.focalLengthType});
+
+  /// The camera direction. See CameraDirection.
+  @JsonKey(name: 'cameraDirection')
+  final int? cameraDirection;
+
+  /// The focal length type. See CameraFocalLengthType.
+  @JsonKey(name: 'focalLengthType')
+  final CameraFocalLengthType? focalLengthType;
+
+  /// @nodoc
+  factory FocalLengthInfo.fromJson(Map<String, dynamic> json) =>
+      _$FocalLengthInfoFromJson(json);
+
+  /// @nodoc
+  Map<String, dynamic> toJson() => _$FocalLengthInfoToJson(this);
 }
 
 /// Video encoder configurations.
@@ -1791,7 +1859,7 @@ class VideoEncoderConfiguration {
   @JsonKey(name: 'frameRate')
   final int? frameRate;
 
-  /// The encoding bitrate (Kbps) of the video. This parameter does not need to be set; keeping the default value standardBitrate is sufficient. The SDK automatically matches the most suitable bitrate based on the video resolution and frame rate you have set. For the correspondence between video resolution, frame rate, and bitrate, please refer to. standardBitrate (0): (Recommended) Standard bitrate mode. compatibleBitrate (-1): Adaptive bitrate mode. In general, Agora suggests that you do not use this value.
+  /// The encoding bitrate (Kbps) of the video. This parameter does not need to be set; keeping the default value standardBitrate is sufficient. The SDK automatically matches the most suitable bitrate based on the video resolution and frame rate you have set. For the correspondence between video resolution and frame rate, see. standardBitrate (0): (Recommended) Standard bitrate mode. compatibleBitrate (-1): Adaptive bitrate mode. In general, Agora suggests that you do not use this value.
   @JsonKey(name: 'bitrate')
   final int? bitrate;
 
@@ -1882,11 +1950,11 @@ class SimulcastStreamConfig {
   /// @nodoc
   const SimulcastStreamConfig({this.dimensions, this.kBitrate, this.framerate});
 
-  /// The video dimension. See VideoDimensions. The default value is 160 × 120.
+  /// The video dimension. See VideoDimensions. The default value is 50% of the high-quality video stream.
   @JsonKey(name: 'dimensions')
   final VideoDimensions? dimensions;
 
-  /// Video receive bitrate (Kbps), represented by an instantaneous value. The default value is 65.
+  /// Video receive bitrate (Kbps), represented by an instantaneous value. This parameter does not need to be set. The SDK automatically matches the most suitable bitrate based on the video resolution and frame rate you set.
   @JsonKey(name: 'kBitrate')
   final int? kBitrate;
 
@@ -1973,7 +2041,7 @@ class WatermarkOptions {
       this.watermarkRatio,
       this.mode});
 
-  /// Is the watermark visible in the local preview view? true : (Default) The watermark is visible in the local preview view. false : The watermark is not visible in the local preview view.
+  /// Whether the watermark is visible in the local preview view: true : (Default) The watermark is visible in the local preview view. false : The watermark is not visible in the local preview view.
   @JsonKey(name: 'visibleInPreview')
   final bool? visibleInPreview;
 
@@ -2470,15 +2538,15 @@ class VideoFormat {
   /// @nodoc
   const VideoFormat({this.width, this.height, this.fps});
 
-  /// The width (px) of the video frame.
+  /// The width (px) of the video frame. The default value is 960.
   @JsonKey(name: 'width')
   final int? width;
 
-  /// The height (px) of the video frame.
+  /// The height (px) of the video frame. The default value is 540.
   @JsonKey(name: 'height')
   final int? height;
 
-  /// The video frame rate (fps).
+  /// The video frame rate (fps). The default value is 15.
   @JsonKey(name: 'fps')
   final int? fps;
 
@@ -2656,6 +2724,49 @@ extension CaptureBrightnessLevelTypeExt on CaptureBrightnessLevelType {
   }
 }
 
+/// Camera stabilization modes.
+///
+/// The camera stabilization effect increases in the order of 1 < 2 < 3, and the latency will also increase accordingly.
+@JsonEnum(alwaysCreate: true)
+enum CameraStabilizationMode {
+  /// -1: (Default) Camera stabilization mode off.
+  @JsonValue(-1)
+  cameraStabilizationModeOff,
+
+  /// 0: Automatic camera stabilization. The system automatically selects a stabilization mode based on the status of the camera. However, the latency is relatively high in this mode, so it is recommended not to use this enumeration.
+  @JsonValue(0)
+  cameraStabilizationModeAuto,
+
+  /// 1: (Recommended) Level 1 camera stabilization.
+  @JsonValue(1)
+  cameraStabilizationModeLevel1,
+
+  /// 2: Level 2 camera stabilization.
+  @JsonValue(2)
+  cameraStabilizationModeLevel2,
+
+  /// 3: Level 3 camera stabilization.
+  @JsonValue(3)
+  cameraStabilizationModeLevel3,
+
+  /// @nodoc
+  @JsonValue(3)
+  cameraStabilizationModeMaxLevel,
+}
+
+/// @nodoc
+extension CameraStabilizationModeExt on CameraStabilizationMode {
+  /// @nodoc
+  static CameraStabilizationMode fromValue(int value) {
+    return $enumDecode(_$CameraStabilizationModeEnumMap, value);
+  }
+
+  /// @nodoc
+  int value() {
+    return _$CameraStabilizationModeEnumMap[this]!;
+  }
+}
+
 /// The state of the local audio.
 @JsonEnum(alwaysCreate: true)
 enum LocalAudioStreamState {
@@ -2716,23 +2827,23 @@ enum LocalAudioStreamReason {
   @JsonValue(5)
   localAudioStreamReasonEncodeFailure,
 
-  /// 6: (Windows and macOS only) No local audio capture device. Remind your users to check whether the microphone is connected to the device properly in the control plane of the device or if the microphone is working properly.
+  /// 6: (Windows and macOS only) No local audio capture device. Remind your users to check whether the microphone is connected to the device properly in the control panel of the device or if the microphone is working properly.
   @JsonValue(6)
   localAudioStreamReasonNoRecordingDevice,
 
-  /// 7: (Windows and macOS only) No local audio capture device. Remind your users to check whether the speaker is connected to the device properly in the control plane of the device or if the speaker is working properly.
+  /// 7: (Windows and macOS only) No local audio capture device. Remind your users to check whether the speaker is connected to the device properly in the control panel of the device or if the speaker is working properly.
   @JsonValue(7)
   localAudioStreamReasonNoPlayoutDevice,
 
-  /// 8: (Android and iOS only) The local audio capture is interrupted by a system call, Siri, or alarm clock. Remind your users to end the phone call, Siri, or alarm clock if the local audio capture is required.
+  /// 8: (Android and iOS only) The local audio capture is interrupted by a system call, smart assistants, or alarm clock. Prompt your users to end the phone call, smart assistants, or alarm clock if the local audio capture is required.
   @JsonValue(8)
   localAudioStreamReasonInterrupted,
 
-  /// 9: (Windows only) The ID of the local audio-capture device is invalid. Check the audio capture device ID.
+  /// 9: (Windows only) The ID of the local audio-capture device is invalid. Prompt the user to check the audio capture device ID.
   @JsonValue(9)
   localAudioStreamReasonRecordInvalidId,
 
-  /// 10: (Windows only) The ID of the local audio-playback device is invalid. Check the audio playback device ID.
+  /// 10: (Windows only) The ID of the local audio-playback device is invalid. Prompt the user to check the audio playback device ID.
   @JsonValue(10)
   localAudioStreamReasonPlayoutInvalidId,
 }
@@ -2794,15 +2905,15 @@ enum LocalVideoStreamReason {
   @JsonValue(1)
   localVideoStreamReasonFailure,
 
-  /// 2: No permission to use the local video capturing device. Remind the user to grant permissions and rejoin the channel. Deprecated: This enumerator is deprecated. Please use camera in the onPermissionError callback instead.
+  /// 2: No permission to use the local video capturing device. Prompt the user to grant permissions and rejoin the channel. Deprecated: This enumerator is deprecated. Please use camera in the onPermissionError callback instead.
   @JsonValue(2)
   localVideoStreamReasonDeviceNoPermission,
 
-  /// 3: The local video capturing device is in use. Remind the user to check whether another application occupies the camera.
+  /// 3: The local video capturing device is in use. Prompt the user to check if the camera is being used by another app, or try to rejoin the channel.
   @JsonValue(3)
   localVideoStreamReasonDeviceBusy,
 
-  /// 4: The local video capture fails. Remind your user to check whether the video capture device is working properly, whether the camera is occupied by another application, or try to rejoin the channel.
+  /// 4: The local video capture fails. Prompt the user to check whether the video capture device is working properly, whether the camera is used by another app, or try to rejoin the channel.
   @JsonValue(4)
   localVideoStreamReasonCaptureFailure,
 
@@ -2810,11 +2921,11 @@ enum LocalVideoStreamReason {
   @JsonValue(5)
   localVideoStreamReasonCodecNotSupport,
 
-  /// 6: (iOS only) The app is in the background. Remind the user that video capture cannot be performed normally when the app is in the background.
+  /// 6: (iOS only) The app is in the background. Prompt the user that video capture cannot be performed normally when the app is in the background.
   @JsonValue(6)
   localVideoStreamReasonCaptureInbackground,
 
-  /// 7: (iOS only) The current application window is running in Slide Over, Split View, or Picture in Picture mode, and another app is occupying the camera. Remind the user that the application cannot capture video properly when the app is running in Slide Over, Split View, or Picture in Picture mode and another app is occupying the camera.
+  /// 7: (iOS only) The current app window is running in Slide Over, Split View, or Picture in Picture mode, and another app is occupying the camera. Prompt the user that the app cannot capture video properly when it is running in Slide Over, Split View, or Picture in Picture mode and another app is occupying the camera.
   @JsonValue(7)
   localVideoStreamReasonCaptureMultipleForegroundApps,
 
@@ -2830,16 +2941,26 @@ enum LocalVideoStreamReason {
   @JsonValue(10)
   localVideoStreamReasonDeviceInvalidId,
 
+  /// 14: (Android only) Video capture is interrupted. Possible reasons include the following:
+  ///  The camera is being used by another app. Prompt the user to check if the camera is being used by another app.
+  ///  The current app has been switched to the background. You can use foreground services to notify the operating system and ensure that the app can still collect video when it switches to the background.
+  @JsonValue(14)
+  localVideoStreamReasonDeviceInterrupt,
+
+  /// 15: (Android only) The video capture device encounters an error. Prompt the user to close and restart the camera to restore functionality. If this operation does not solve the problem, check if the camera has a hardware failure.
+  @JsonValue(15)
+  localVideoStreamReasonDeviceFatalError,
+
   /// 101: The current video capture device is unavailable due to excessive system pressure.
   @JsonValue(101)
   localVideoStreamReasonDeviceSystemPressure,
 
-  /// 11: (macOS and Windows only) The shared windows is minimized when you call the startScreenCaptureByWindowId method to share a window. The SDK cannot share a minimized window. You can cancel the minimization of this window at the application layer, for example by maximizing this window.
+  /// 11: (macOS and Windows only) The shared window is minimized when you call the startScreenCaptureByWindowId method to share a window. The SDK cannot share a minimized window. Please prompt the user to unminimize the shared window.
   @JsonValue(11)
   localVideoStreamReasonScreenCaptureWindowMinimized,
 
   /// 12: (macOS and Windows only) The error code indicates that a window shared by the window ID has been closed or a full-screen window shared by the window ID has exited full-screen mode. After exiting full-screen mode, remote users cannot see the shared window. To prevent remote users from seeing a black screen, Agora recommends that you immediately stop screen sharing. Common scenarios reporting this error code:
-  ///  When the local user closes the shared window, the SDK reports this error code.
+  ///  The local user closes the shared window.
   ///  The local user shows some slides in full-screen mode first, and then shares the windows of the slides. After the user exits full-screen mode, the SDK reports this error code.
   ///  The local user watches a web video or reads a web document in full-screen mode first, and then shares the window of the web video or document. After the user exits full-screen mode, the SDK reports this error code.
   @JsonValue(12)
@@ -2873,7 +2994,7 @@ enum LocalVideoStreamReason {
   @JsonValue(26)
   localVideoStreamReasonScreenCaptureWindowRecoverFromHidden,
 
-  /// 27: (Windows only) The window for screen capture has been restored from minimized state.
+  /// 27: (macOS and Windows only) The window for screen capture has been restored from the minimized state.
   @JsonValue(27)
   localVideoStreamReasonScreenCaptureWindowRecoverFromMinimized,
 
@@ -2970,6 +3091,14 @@ enum RemoteAudioStateReason {
   /// 7: The remote user leaves the channel.
   @JsonValue(7)
   remoteAudioReasonRemoteOffline,
+
+  /// @nodoc
+  @JsonValue(8)
+  remoteAudioReasonNoPacketReceive,
+
+  /// @nodoc
+  @JsonValue(9)
+  remoteAudioReasonLocalPlayFailed,
 }
 
 /// @nodoc
@@ -3137,7 +3266,6 @@ class VideoTrackInfo {
       this.ownerUid,
       this.trackId,
       this.channelId,
-      this.streamType,
       this.codecType,
       this.encodedFrameOnly,
       this.sourceType,
@@ -3158,10 +3286,6 @@ class VideoTrackInfo {
   /// @nodoc
   @JsonKey(name: 'channelId')
   final String? channelId;
-
-  /// @nodoc
-  @JsonKey(name: 'streamType')
-  final VideoStreamType? streamType;
 
   /// @nodoc
   @JsonKey(name: 'codecType')
@@ -3578,7 +3702,7 @@ enum RtmpStreamPublishReason {
   @JsonValue(15)
   rtmpStreamPublishReasonInvalidAppid,
 
-  /// 16: Your project does not have permission to use streaming services. Refer to Media Push to enable the Media Push permission.
+  /// 16: Your project does not have permission to use streaming services.
   @JsonValue(16)
   rtmpStreamPublishReasonInvalidPrivilege,
 
@@ -3856,7 +3980,7 @@ class LiveTranscoding {
   @JsonKey(name: 'height')
   final int? height;
 
-  /// Bitrate of the output video stream for Media Push in Kbps. The default value is 400 Kbps. Set this member according to the table. If you set a bitrate beyond the proper range, the SDK automatically adapts it to a value within the range.
+  /// The encoding bitrate (Kbps) of the video. This parameter does not need to be set; keeping the default value standardBitrate is sufficient. The SDK automatically matches the most suitable bitrate based on the video resolution and frame rate you have set. For the correspondence between video resolution and frame rate, see.
   @JsonKey(name: 'videoBitrate')
   final int? videoBitrate;
 
@@ -4235,11 +4359,11 @@ enum ConnectionChangedReasonType {
   @JsonValue(2)
   connectionChangedInterrupted,
 
-  /// 3: The connection between the SDK and the Agora edge server is banned by the Agora edge server. This error occurs when the user is kicked out of the channel by the server.
+  /// 3: The connection between the SDK and the Agora edge server is banned by the Agora edge server. For example, when a user is kicked out of the channel, this status will be returned.
   @JsonValue(3)
   connectionChangedBannedByServer,
 
-  /// 4: The SDK fails to join the channel. When the SDK fails to join the channel for more than 20 minutes, this error occurs and the SDK stops reconnecting to the channel.
+  /// 4: The SDK fails to join the channel. When the SDK fails to join the channel for more than 20 minutes, this code will be returned and the SDK stops reconnecting to the channel. You need to prompt the user to try to switch to another network and rejoin the channel.
   @JsonValue(4)
   connectionChangedJoinFailed,
 
@@ -4247,21 +4371,30 @@ enum ConnectionChangedReasonType {
   @JsonValue(5)
   connectionChangedLeaveChannel,
 
-  /// 6: The connection failed because the App ID is not valid. Please rejoin the channel with a valid App ID.
+  /// 6: The App ID is invalid. You need to rejoin the channel with a valid APP ID and make sure the App ID you are using is consistent with the one generated in the Agora Console.
   @JsonValue(6)
   connectionChangedInvalidAppId,
 
-  /// 7: The connection failed since channel name is not valid. Rejoin the channel with a valid channel name.
+  /// 7: Invalid channel name. Rejoin the channel with a valid channel name. A valid channel name is a string of up to 64 bytes in length. Supported characters (89 characters in total):
+  ///  All lowercase English letters: a to z.
+  ///  All uppercase English letters: A to Z.
+  ///  All numeric characters: 0 to 9.
+  ///  Space
+  ///  "!", "#", "$", "%", "&", "(", ")", "+", "-", ":", ";", "<", "=", ".", ">", "?", "@", "[", "]", "^", "_", "{", "}", "|", "~", ","
   @JsonValue(7)
   connectionChangedInvalidChannelName,
 
-  /// 8: The connection failed because the token is not valid. Possible reasons are as follows:
-  ///  The App Certificate for the project is enabled in Agora Console, but you do not use a token when joining the channel. If you enable the App Certificate, you must use a token to join the channel.
+  /// 8: Invalid token. Possible reasons are as follows:
+  ///  The App Certificate for the project is enabled in Agora Console, but you do not pass in a token when joining a channel.
   ///  The uid specified when calling joinChannel to join the channel is inconsistent with the uid passed in when generating the token.
+  ///  The generated token and the token used to join the channel are not consistent. Ensure the following:
+  ///  When your project enables App Certificate, you need to pass in a token to join a channel.
+  ///  The user ID specified when generating the token is consistent with the user ID used when joining the channel.
+  ///  The generated token is the same as the token passed in to join the channel.
   @JsonValue(8)
   connectionChangedInvalidToken,
 
-  /// 9: The connection failed since token is expired.
+  /// (9): The token currently being used has expired. You need to generate a new token on your server and rejoin the channel with the new token.
   @JsonValue(9)
   connectionChangedTokenExpired,
 
@@ -4279,7 +4412,7 @@ enum ConnectionChangedReasonType {
   @JsonValue(12)
   connectionChangedRenewToken,
 
-  /// 13: The IP address of the client has changed, possibly because the network type, IP address, or port has been changed.
+  /// (13): Client IP address changed. If you receive this code multiple times, You need to prompt the user to switch networks and try joining the channel again.
   @JsonValue(13)
   connectionChangedClientIpAddressChanged,
 
@@ -4563,7 +4696,7 @@ class VideoCanvas {
   @JsonKey(name: 'subviewUid')
   final int? subviewUid;
 
-  /// The video display window.
+  /// The video display window. In one VideoCanvas, you can only choose to set either view or surfaceTexture. If both are set, only the settings in view take effect.
   @JsonKey(name: 'view')
   final int? view;
 
@@ -4597,8 +4730,7 @@ class VideoCanvas {
   @JsonKey(name: 'cropArea')
   final Rectangle? cropArea;
 
-  /// (Optional) Whether the receiver enables alpha mask rendering: true : The receiver enables alpha mask rendering. false : (default) The receiver disables alpha mask rendering. Alpha mask rendering can create images with transparent effects and extract portraits from videos. When used in combination with other methods, you can implement effects such as portrait-in-picture and watermarking.
-  ///  This property applies to macOS only.
+  /// (Optional) Whether the receiver enables alpha mask rendering: true : The receiver enables alpha mask rendering. false : (Default) The receiver disables alpha mask rendering. Alpha mask rendering can create images with transparent effects and extract portraits from videos. When used in combination with other methods, you can implement effects such as portrait-in-picture and watermarking.
   ///  The receiver can render alpha channel information only when the sender enables alpha transmission.
   ///  To enable alpha transmission,.
   @JsonKey(name: 'enableAlphaMask')
@@ -4963,7 +5095,7 @@ class SegmentationProperty {
   @JsonKey(name: 'modelType')
   final SegModelType? modelType;
 
-  /// The range of accuracy for identifying green colors (different shades of green) in the view. The value range is [0,1], and the default value is 0.5. The larger the value, the wider the range of identifiable shades of green. When the value of this parameter is too large, the edge of the portrait and the green color in the portrait range are also detected. Agora recommends that you dynamically adjust the value of this parameter according to the actual effect. This parameter only takes effect when modelType is set to segModelGreen.
+  /// The accuracy range for recognizing background colors in the image. The value range is [0,1], and the default value is 0.5. The larger the value, the wider the range of identifiable shades of pure color. When the value of this parameter is too large, the edge of the portrait and the pure color in the portrait range are also detected. Agora recommends that you dynamically adjust the value of this parameter according to the actual effect. This parameter only takes effect when modelType is set to segModelGreen.
   @JsonKey(name: 'greenCapacity')
   final double? greenCapacity;
 
@@ -5169,6 +5301,10 @@ enum AudioEffectPreset {
   @JsonValue(0x02010900)
   roomAcousticsVirtualSurroundSound,
 
+  /// The audio effect of chorus. Agora recommends using this effect in chorus scenarios to enhance the sense of depth and dimension in the vocals.
+  @JsonValue(0x02010D00)
+  roomAcousticsChorus,
+
   /// A middle-aged man's voice. Agora recommends using this preset to process a male-sounding voice; otherwise, you may not hear the anticipated voice effect.
   @JsonValue(0x02020100)
   voiceChangerEffectUncle,
@@ -5349,9 +5485,13 @@ class ScreenCaptureParameters {
       this.highLightColor,
       this.enableHighLight});
 
-  /// The video encoding resolution of the shared screen stream. See VideoDimensions. The default value is 1920 × 1080, that is, 2,073,600 pixels. Agora uses the value of this parameter to calculate the charges. If the screen dimensions are different from the value of this parameter, Agora applies the following strategies for encoding. Suppose dimensions is set to 1920 × 1080:
+  /// The video encoding resolution of the screen sharing stream. See VideoDimensions. The default value is 1920 × 1080, that is, 2,073,600 pixels. Agora uses the value of this parameter to calculate the charges. If the screen dimensions are different from the value of this parameter, Agora applies the following strategies for encoding. Suppose dimensions is set to 1920 × 1080:
   ///  If the value of the screen dimensions is lower than that of dimensions, for example, 1000 × 1000 pixels, the SDK uses the screen dimensions, that is, 1000 × 1000 pixels, for encoding.
-  ///  If the value of the screen dimensions is higher than that of dimensions, for example, 2000 × 1500, the SDK uses the maximum value under dimensions with the aspect ratio of the screen dimension (4:3) for encoding, that is, 1440 × 1080.
+  ///  If the value of the screen dimensions is higher than that of dimensions, for example, 2000 × 1500, the SDK uses the maximum value under dimensions with the aspect ratio of the screen dimension (4:3) for encoding, that is, 1440 × 1080. When setting the encoding resolution in the scenario of sharing documents (screenScenarioDocument), choose one of the following two methods:
+  ///  If you require the best image quality, it is recommended to set the encoding resolution to be the same as the capture resolution.
+  ///  If you wish to achieve a relative balance between image quality, bandwidth, and system performance, then:
+  ///  When the capture resolution is greater than 1920 × 1080, it is recommended that the encoding resolution is not less than 1920 × 1080.
+  ///  When the capture resolution is less than 1920 × 1080, it is recommended that the encoding resolution is not less than 1280 × 720.
   @JsonKey(name: 'dimensions')
   final VideoDimensions? dimensions;
 
@@ -5367,7 +5507,7 @@ class ScreenCaptureParameters {
   @JsonKey(name: 'captureMouseCursor')
   final bool? captureMouseCursor;
 
-  /// Whether to bring the window to the front when calling the startScreenCaptureByWindowId method to share it: true : Bring the window to the front. false : (Default) Do not bring the window to the front.
+  /// Whether to bring the window to the front when calling the startScreenCaptureByWindowId method to share it: true : Bring the window to the front. false : (Default) Do not bring the window to the front. Due to macOS system limitations, when setting this member to bring the window to the front, if the current app has multiple windows, only the main window will be brought to the front.
   @JsonKey(name: 'windowFocus')
   final bool? windowFocus;
 
@@ -5721,7 +5861,7 @@ enum ChannelMediaRelayError {
   @JsonValue(1)
   relayErrorServerErrorResponse,
 
-  /// 2: No server response. You can call leaveChannel to leave the channel. This error can also occur if your project has not enabled co-host token authentication. You can to enable the service for cohosting across channels before starting a channel media relay.
+  /// 2: No server response. This error may be caused by poor network connections. If this error occurs when initiating a channel media relay, you can try again later; if this error occurs during channel media relay, you can call leaveChannel to leave the channel. This error can also occur if the channel media relay service is not enabled in the project. You can contact to enable the service.
   @JsonValue(2)
   relayErrorServerNoResponse,
 
@@ -6016,7 +6156,10 @@ extension EncryptionModeExt on EncryptionMode {
 class EncryptionConfig {
   /// @nodoc
   const EncryptionConfig(
-      {this.encryptionMode, this.encryptionKey, this.encryptionKdfSalt});
+      {this.encryptionMode,
+      this.encryptionKey,
+      this.encryptionKdfSalt,
+      this.datastreamEncryptionEnabled});
 
   /// The built-in encryption mode. See EncryptionMode. Agora recommends using aes128Gcm2 or aes256Gcm2 encrypted mode. These two modes support the use of salt for higher security.
   @JsonKey(name: 'encryptionMode')
@@ -6029,6 +6172,10 @@ class EncryptionConfig {
   /// Salt, 32 bytes in length. Agora recommends that you use OpenSSL to generate salt on the server side. See Media Stream Encryption for details. This parameter takes effect only in aes128Gcm2 or aes256Gcm2 encrypted mode. In this case, ensure that this parameter is not 0.
   @JsonKey(name: 'encryptionKdfSalt', ignore: true)
   final Uint8List? encryptionKdfSalt;
+
+  /// Whether to enable data stream encryption: true : Enable data stream encryption. false : (Default) Disable data stream encryption.
+  @JsonKey(name: 'datastreamEncryptionEnabled')
+  final bool? datastreamEncryptionEnabled;
 
   /// @nodoc
   factory EncryptionConfig.fromJson(Map<String, dynamic> json) =>
@@ -6045,13 +6192,21 @@ enum EncryptionErrorType {
   @JsonValue(0)
   encryptionErrorInternalFailure,
 
-  /// 1: Decryption errors. Ensure that the receiver and the sender use the same encryption mode and key.
+  /// 1: Media stream decryption error. Ensure that the receiver and the sender use the same encryption mode and key.
   @JsonValue(1)
   encryptionErrorDecryptionFailure,
 
-  /// 2: Encryption errors.
+  /// 2: Media stream encryption error.
   @JsonValue(2)
   encryptionErrorEncryptionFailure,
+
+  /// 3: Data stream decryption error. Ensure that the receiver and the sender use the same encryption mode and key.
+  @JsonValue(3)
+  encryptionErrorDatastreamDecryptionFailure,
+
+  /// 4: Data stream encryption error.
+  @JsonValue(4)
+  encryptionErrorDatastreamEncryptionFailure,
 }
 
 /// @nodoc
@@ -6271,20 +6426,24 @@ class UserInfo {
   Map<String, dynamic> toJson() => _$UserInfoToJson(this);
 }
 
-/// The audio filter of in-ear monitoring.
+/// The audio filter types of in-ear monitoring.
 @JsonEnum(alwaysCreate: true)
 enum EarMonitoringFilterType {
-  /// 1<<0: Do not add an audio filter to the in-ear monitor.
+  /// 1<<0: No audio filter added to in-ear monitoring.
   @JsonValue((1 << 0))
   earMonitoringFilterNone,
 
-  /// 1<<1: Add an audio filter to the in-ear monitor. If you implement functions such as voice beautifier and audio effect, users can hear the voice after adding these effects.
+  /// 1<<1: Add vocal effects audio filter to in-ear monitoring. If you implement functions such as voice beautifier and audio effect, users can hear the voice after adding these effects.
   @JsonValue((1 << 1))
   earMonitoringFilterBuiltInAudioFilters,
 
-  /// 1<<2: Enable noise suppression to the in-ear monitor.
+  /// 1<<2: Add noise suppression audio filter to in-ear monitoring.
   @JsonValue((1 << 2))
   earMonitoringFilterNoiseSuppression,
+
+  /// 1<<15: Reuse the audio filter that has been processed on the sending end for in-ear monitoring. This enumerator reduces CPU usage while increasing in-ear monitoring latency, which is suitable for latency-tolerant scenarios requiring low CPU consumption.
+  @JsonValue((1 << 15))
+  earMonitoringFilterReusePostProcessingFilter,
 }
 
 /// @nodoc
@@ -6475,41 +6634,41 @@ class VideoRenderingTracingInfo {
       this.remoteJoined2UnmuteVideo,
       this.remoteJoined2PacketReceived});
 
-  /// The time interval from calling the startMediaRenderingTracing method to SDK triggering the onVideoRenderingTracingResult callback. The unit is milliseconds. Agora recommends you call startMediaRenderingTracing before joining a channel.
+  /// The time interval (ms) from startMediaRenderingTracing to SDK triggering the onVideoRenderingTracingResult callback. Agora recommends you call startMediaRenderingTracing before joining a channel.
   @JsonKey(name: 'elapsedTime')
   final int? elapsedTime;
 
-  /// The time interval from calling startMediaRenderingTracing to calling joinChannel. The unit is milliseconds. A negative number means to call joinChannel after calling startMediaRenderingTracing.
+  /// The time interval (ms) from startMediaRenderingTracing to joinChannel. A negative number indicates that startMediaRenderingTracing is called after calling joinChannel.
   @JsonKey(name: 'start2JoinChannel')
   final int? start2JoinChannel;
 
-  /// Time interval from calling joinChannel to successfully joining the channel. The unit is milliseconds.
+  /// The time interval (ms) from or joinChannel to successfully joining the channel.
   @JsonKey(name: 'join2JoinSuccess')
   final int? join2JoinSuccess;
 
-  /// If the local user calls startMediaRenderingTracing before successfully joining the channel, this value is the time interval from the local user successfully joining the channel to the remote user joining the channel. The unit is milliseconds.
-  ///  If the local user calls startMediaRenderingTracing after successfully joining the channel, the value is the time interval from calling startMediaRenderingTracing to when the remote user joins the channel. The unit is milliseconds.
+  /// If the local user calls startMediaRenderingTracing before successfully joining the channel, this value is the time interval (ms) from the local user successfully joining the channel to the remote user joining the channel.
+  ///  If the local user calls startMediaRenderingTracing after successfully joining the channel, the value is the time interval (ms) from startMediaRenderingTracing to when the remote user joins the channel.
   ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, the value is 0 and meaningless.
   ///  In order to reduce the time of rendering the first frame for remote users, Agora recommends that the local user joins the channel when the remote user is in the channel to reduce this value.
   @JsonKey(name: 'joinSuccess2RemoteJoined')
   final int? joinSuccess2RemoteJoined;
 
-  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval from when the remote user joins the channel to when the local user sets the remote view. The unit is milliseconds.
-  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval from calling startMediaRenderingTracing to setting the remote view. The unit is milliseconds.
+  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval (ms) from when the remote user joins the channel to when the local user sets the remote view.
+  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval (ms) from calling startMediaRenderingTracing to setting the remote view.
   ///  If the local user calls startMediaRenderingTracing after setting the remote view, the value is 0 and has no effect.
   ///  In order to reduce the time of rendering the first frame for remote users, Agora recommends that the local user sets the remote view before the remote user joins the channel, or sets the remote view immediately after the remote user joins the channel to reduce this value.
   @JsonKey(name: 'remoteJoined2SetView')
   final int? remoteJoined2SetView;
 
-  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval from the remote user joining the channel to subscribing to the remote video stream. The unit is milliseconds.
-  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval from calling startMediaRenderingTracing to subscribing to the remote video stream. The unit is milliseconds.
+  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval (ms) from the remote user joining the channel to subscribing to the remote video stream.
+  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval (ms) from startMediaRenderingTracing to subscribing to the remote video stream.
   ///  If the local user calls startMediaRenderingTracing after subscribing to the remote video stream, the value is 0 and has no effect.
   ///  In order to reduce the time of rendering the first frame for remote users, Agora recommends that after the remote user joins the channel, the local user immediately subscribes to the remote video stream to reduce this value.
   @JsonKey(name: 'remoteJoined2UnmuteVideo')
   final int? remoteJoined2UnmuteVideo;
 
-  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval from when the remote user joins the channel to when the local user receives the remote video stream. The unit is milliseconds.
-  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval from calling startMediaRenderingTracing to receiving the remote video stream. The unit is milliseconds.
+  /// If the local user calls startMediaRenderingTracing before the remote user joins the channel, this value is the time interval (ms) from when the remote user joins the channel to when the local user receives the remote video stream.
+  ///  If the local user calls startMediaRenderingTracing after the remote user joins the channel, this value is the time interval (ms) from startMediaRenderingTracing to receiving the remote video stream.
   ///  If the local user calls startMediaRenderingTracing after receiving the remote video stream, the value is 0 and has no effect.
   ///  In order to reduce the time of rendering the first frame for remote users, Agora recommends that the remote user publishes video streams immediately after joining the channel, and the local user immediately subscribes to remote video streams to reduce this value.
   @JsonKey(name: 'remoteJoined2PacketReceived')

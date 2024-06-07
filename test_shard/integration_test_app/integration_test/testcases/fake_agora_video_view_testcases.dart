@@ -11,6 +11,7 @@ import 'package:agora_rtc_engine/src/impl/agora_rtc_engine_impl.dart';
 import '../fake/fake_iris_method_channel.dart';
 import 'package:agora_rtc_engine/src/impl/platform/io/global_video_view_controller_platform_io.dart';
 import 'package:agora_rtc_engine/src/impl/platform/io/native_iris_api_engine_binding_delegate.dart';
+import 'package:iris_method_channel/iris_method_channel.dart';
 
 class _RenderViewWidget extends StatefulWidget {
   const _RenderViewWidget({
@@ -129,7 +130,7 @@ class FakeMethodChannelController {
       methodCallQueue.add(message);
 
       if (message.method == 'createTextureRender') {
-        final t = textrueId++;
+        final t = ++textrueId;
         final channelId = 'agora_rtc_engine/texture_render_$t';
         final c = MethodChannel(channelId);
         testDefaultBinaryMessenger.setMockMethodCallHandler(c, (message) async {
@@ -143,6 +144,8 @@ class FakeMethodChannelController {
               const MethodCall('onSizeChanged', {'width': 50, 'height': 50}));
         });
         return t;
+      } else if (message.method == 'destroyTextureRender') {
+        return true;
       }
 
       return 0;
@@ -162,13 +165,6 @@ class FakeMethodChannelController {
   void reset() {
     methodCallQueue.clear();
     textrueId = 0;
-  }
-
-  void dispose() {
-    for (final c in mockedMethodChannels) {
-      testDefaultBinaryMessenger.setMockMethodCallHandler(c, null);
-    }
-    reset();
   }
 
   void triggerPlatformMessage(String channelId, MethodCall methodCall) async {
@@ -191,6 +187,11 @@ void testCases() {
 
     setUp(() {
       irisMethodChannel.reset();
+      irisMethodChannel.config =
+          FakeIrisMethodChannelConfig(fakeInvokeMethods: {
+        'CreateIrisRtcRendering': CallApiResult(
+            data: {'irisRtcRenderingHandle': 100}, irisReturnCode: 0)
+      });
     });
 
     group(
@@ -570,8 +571,8 @@ void testCases() {
                 }
                 return found;
               }), findsOneWidget);
-              // The first textureId is 0
-              expect(textureId == 0, isTrue);
+              // The first textureId is 1
+              expect(textureId == 1, isTrue);
             }
 
             fakeMethodChannelController.reset();
@@ -594,8 +595,6 @@ void testCases() {
 
               expect(disposeTextureRenderTextureId != -1, isTrue);
             }
-
-            fakeMethodChannelController.dispose();
           },
         );
 
@@ -646,8 +645,8 @@ void testCases() {
                 }
                 return found;
               }), findsOneWidget);
-              // The first textureId is 0
-              expect(textureId == 0, isTrue);
+              // The first textureId is 1
+              expect(textureId == 1, isTrue);
             }
 
             videoViewCreatedCompleter = Completer<void>();
@@ -692,11 +691,9 @@ void testCases() {
                 }
                 return found;
               }), findsOneWidget);
-              // The first textureId is 0
-              expect(textureId == 0, isTrue);
+              // The first textureId is 1
+              expect(textureId == 1, isTrue);
             }
-
-            fakeMethodChannelController.dispose();
           },
         );
 
@@ -816,10 +813,10 @@ void testCases() {
                   }
                   return found;
                 }), findsNWidgets(2));
-                // The first textureId is 0
-                expect(textureIds[0] == 0, isTrue);
-                // The second textureId is 0
-                expect(textureIds[1] == 1, isTrue);
+                // The first textureId is 1
+                expect(textureIds[0] == 1, isTrue);
+                // The second textureId is 1
+                expect(textureIds[1] == 2, isTrue);
               }
             }
 
@@ -887,14 +884,12 @@ void testCases() {
                   }
                   return found;
                 }), findsNWidgets(2));
-                // The third textureId is 2
-                expect(textureIds[0] == 2, isTrue);
+                // The third textureId is 3
+                expect(textureIds[0] == 3, isTrue);
                 // The fourth textureId is 3
-                expect(textureIds[1] == 3, isTrue);
+                expect(textureIds[1] == 4, isTrue);
               }
             }
-
-            fakeMethodChannelController.dispose();
 
             await tester.pumpWidget(Container());
             await tester.pumpAndSettle(const Duration(milliseconds: 5000));
