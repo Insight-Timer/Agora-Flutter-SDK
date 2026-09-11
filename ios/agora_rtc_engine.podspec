@@ -29,7 +29,7 @@ Pod::Spec.new do |s|
     # iris dependencies end
 
     # native dependencies start
-    s.dependency 'AgoraRtcEngine_iOS', '4.6.4'
+    s.dependency 'AgoraLite_iOS', '4.6.4'
     # native dependencies end
   end
   

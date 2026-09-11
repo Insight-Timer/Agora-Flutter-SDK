@@ -62,8 +62,7 @@ dependencies {
     // iris dependencies end
 
     // native dependencies start
-    api 'io.agora.rtc:full-sdk:4.6.4'
-    api 'io.agora.rtc:full-screen-sharing:4.6.4'
+    api 'io.agora.rtc:lite-sdk:4.6.4'
     // native dependencies end
   }
 }

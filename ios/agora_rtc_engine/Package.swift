@@ -12,13 +12,13 @@ let package = Package(
         .library(name: "agora-rtc-engine", targets: ["agora_rtc_engine"])
     ],
     dependencies: [
-        .package(url: "https://github.com/AgoraIO/AgoraRtcEngine_iOS.git", exact: "4.6.4"),
+        .package(url: "https://github.com/AgoraIO/AgoraLite_iOS.git", exact: "4.6.4"),
     ],
     targets: [
         .target(
             name: "agora_rtc_engine",
             dependencies: [
-                .product(name: "RtcBasic", package: "AgoraRtcEngine_iOS"),
+                .product(name: "RtcBasic", package: "AgoraLite_iOS"),
                 "AgoraRtcWrapper"
             ],
             cSettings: [
