@@ -6,6 +6,12 @@
 
 @property(nonatomic, strong) UIView *surfaceView;
 
+/// Hosts the render view over a backdrop in the host's colour a point past a rounded frame: Flutter paints
+/// nothing under a platform view, and the frame's antialiased edge would show the hole beneath.
+@property(nonatomic, strong) UIView *containerView;
+
+@property(nonatomic, strong) UIView *backdropView;
+
 @property(nonatomic, strong) FlutterMethodChannel *methodChannel;
 
 @property(nonatomic) NSString *viewType;
@@ -32,6 +38,16 @@
     self.viewType = [args objectForKey:@"viewType"];
     self.surfaceView = (UIView *)[self.controller createPlatformRender:viewId frame:frame];
     self.platformViewId = viewId;
+    // Always hosted: a letterboxed frame later asks for square corners and a filling one for round, at runtime.
+    self.containerView = [[UIView alloc] initWithFrame:frame];
+    self.surfaceView.frame = self.containerView.bounds;
+    self.surfaceView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    [self.containerView addSubview:self.surfaceView];
+    NSNumber *argb = [args objectForKey:@"cornerBackgroundColor"];
+    if ([argb isKindOfClass:[NSNumber class]]) {
+      [self addBackdropWithColor:[argb longLongValue]];
+    }
+    [self setCornerRadius:[[args objectForKey:@"cornerRadius"] doubleValue]];
     self.methodChannel = [FlutterMethodChannel
         methodChannelWithName:
             [NSString
@@ -65,7 +81,24 @@
 }
 
 - (nonnull UIView *)view {
-  return self.surfaceView;
+  return self.containerView;
+}
+
+- (void)setCornerRadius:(double)radius {
+  self.surfaceView.layer.cornerRadius = radius;
+  self.surfaceView.clipsToBounds = radius > 0;
+  // A square frame sits over the host's own artwork, which must show at its edges rather than the page.
+  self.backdropView.hidden = radius <= 0;
+}
+
+- (void)addBackdropWithColor:(int64_t)argb {
+  self.backdropView = [[UIView alloc] initWithFrame:CGRectInset(self.containerView.bounds, -1, -1)];
+  self.backdropView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  self.backdropView.backgroundColor = [UIColor colorWithRed:((argb >> 16) & 0xFF) / 255.0
+                                                      green:((argb >> 8) & 0xFF) / 255.0
+                                                       blue:(argb & 0xFF) / 255.0
+                                                      alpha:((argb >> 24) & 0xFF) / 255.0];
+  [self.containerView insertSubview:self.backdropView atIndex:0];
 }
 
 - (void)onMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result {
@@ -84,6 +117,11 @@
   } else if ([@"deleteNativeViewPtr" isEqualToString:call.method]) {
       // Do nothing
       result(@(0));
+  } else if ([@"setCornerRadius" isEqualToString:call.method]) {
+      if ([call.arguments isKindOfClass:[NSNumber class]]) {
+        [self setCornerRadius:[call.arguments doubleValue]];
+      }
+      result(nil);
   }
 }
 

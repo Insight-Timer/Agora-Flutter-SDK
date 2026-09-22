@@ -31,6 +31,8 @@ class AgoraVideoViewState extends State<AgoraVideoView> {
       return AgoraRtcRenderPlatformView(
         controller: widget.controller,
         onAgoraVideoViewCreated: widget.onAgoraVideoViewCreated,
+        cornerRadius: widget.cornerRadius,
+        cornerBackgroundColor: widget.cornerBackgroundColor,
       );
     }
 
@@ -52,6 +54,8 @@ class AgoraVideoViewState extends State<AgoraVideoView> {
     return AgoraRtcRenderPlatformView(
       controller: widget.controller,
       onAgoraVideoViewCreated: widget.onAgoraVideoViewCreated,
+      cornerRadius: widget.cornerRadius,
+      cornerBackgroundColor: widget.cornerBackgroundColor,
     );
   }
 }
@@ -61,11 +65,19 @@ class AgoraRtcRenderPlatformView extends StatefulWidget {
     Key? key,
     required this.controller,
     this.onAgoraVideoViewCreated,
+    this.cornerRadius = 0,
+    this.cornerBackgroundColor,
   }) : super(key: key);
 
   final VideoViewControllerBase controller;
 
   final AgoraVideoViewCreatedCallback? onAgoraVideoViewCreated;
+
+  /// See [AgoraVideoView.cornerRadius].
+  final double cornerRadius;
+
+  /// See [AgoraVideoView.cornerBackgroundColor].
+  final Color? cornerBackgroundColor;
 
   @override
   State<AgoraRtcRenderPlatformView> createState() =>
@@ -137,12 +149,21 @@ class _AgoraRtcRenderPlatformViewState extends State<AgoraRtcRenderPlatformView>
     } else {
       _controller(widget.controller).updateController(oldWidget.controller);
     }
+    if (defaultTargetPlatform != TargetPlatform.iOS) return;
+    if (widget.cornerRadius != oldWidget.cornerRadius) {
+      await getMethodChannel()
+          ?.invokeMethod<void>('setCornerRadius', widget.cornerRadius);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return buildPlatformView(
       viewType: _viewType,
+      creationParams: <String, Object?>{
+        'cornerRadius': widget.cornerRadius,
+        'cornerBackgroundColor': widget.cornerBackgroundColor?.toARGB32(),
+      },
       onPlatformViewCreated: (int id) {
         _platformViewId = id;
         _setupVideo();
