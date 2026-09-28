@@ -6,8 +6,9 @@
 
 @property(nonatomic, strong) UIView *surfaceView;
 
-/// Hosts the render view over a backdrop in the host's colour a point past a rounded frame: Flutter paints
-/// nothing under a platform view, and the frame's antialiased edge would show the hole beneath.
+/// Hosts the render view over a backdrop in the host's colour filling a rounded frame: Flutter paints
+/// nothing under a platform view, and the frame's antialiased edge would show the hole beneath. It stays
+/// inside the frame, where Flutter's overlays cover it; past it, it shows over a header passing on top.
 @property(nonatomic, strong) UIView *containerView;
 
 @property(nonatomic, strong) UIView *backdropView;
@@ -92,7 +93,7 @@
 }
 
 - (void)addBackdropWithColor:(int64_t)argb {
-  self.backdropView = [[UIView alloc] initWithFrame:CGRectInset(self.containerView.bounds, -1, -1)];
+  self.backdropView = [[UIView alloc] initWithFrame:self.containerView.bounds];
   self.backdropView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   self.backdropView.backgroundColor = [UIColor colorWithRed:((argb >> 16) & 0xFF) / 255.0
                                                       green:((argb >> 8) & 0xFF) / 255.0
