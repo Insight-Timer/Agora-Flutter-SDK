@@ -1,6 +1,7 @@
 #import "./include/agora_rtc_engine/AgoraRtcNgPlugin.h"
 #import "./include/agora_rtc_engine/AgoraSurfaceViewFactory.h"
 #import "./include/agora_rtc_engine/AgoraUtils.h"
+#import "./include/agora_rtc_engine/SampleBufferPIPController.h"
 #import "./include/agora_rtc_engine/VideoViewController.h"
 #include <Foundation/Foundation.h>
 
@@ -12,7 +13,7 @@
 
 @property(nonatomic) NSObject<FlutterPluginRegistrar> *registrar;
 
-@property(nonatomic) AgoraPIPController *pipController;
+@property(nonatomic) SampleBufferPIPController *pipController;
 
 @end
 
@@ -39,7 +40,7 @@
                           withId:@"AgoraSurfaceView"];
 
   // create pip controller
-  instance.pipController = [[AgoraPIPController alloc]
+  instance.pipController = [[SampleBufferPIPController alloc]
       initWith:(id<AgoraPIPStateChangedDelegate>)instance];
 }
 
@@ -215,8 +216,8 @@
 
       // apiEngine
       if ([call.arguments objectForKey:@"apiEngine"]) {
-        options.apiEngine =
-            (void *)[[call.arguments objectForKey:@"apiEngine"] pointerValue];
+        options.apiEngine = (void *)(intptr_t)[
+            [call.arguments objectForKey:@"apiEngine"] longLongValue];
       }
 
       // preferred content size
