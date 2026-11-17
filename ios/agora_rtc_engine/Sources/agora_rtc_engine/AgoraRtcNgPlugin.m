@@ -215,8 +215,8 @@
 
       // apiEngine
       if ([call.arguments objectForKey:@"apiEngine"]) {
-        options.apiEngine =
-            (void *)[[call.arguments objectForKey:@"apiEngine"] pointerValue];
+        options.apiEngine = (void *)(intptr_t)[
+            [call.arguments objectForKey:@"apiEngine"] longLongValue];
       }
 
       // preferred content size
